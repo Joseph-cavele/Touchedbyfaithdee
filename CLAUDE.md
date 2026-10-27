@@ -1,60 +1,73 @@
 @AGENTS.md
 
-# Task: Rebrand the Existing Project for La-fe Beauty Parlor
+# Touchedbyfaithdee Studio
 
-Update my existing salon application to match the branding of La-fe Beauty Parlor, using the provided logo and promotional poster as visual references.
+Salon booking system for **Touchedbyfaithdee Studio**: a marketing site, online booking and an owner dashboard. Built on Next.js (see AGENTS.md: read `node_modules/next/dist/docs/` before writing code), MongoDB via Mongoose, Tailwind.
 
-**IMPORTANT:** Do not rebuild the application. Do not change existing functionality. Only update the branding and hero section.
+The codebase started as the La-fe Beauty Parlor site and was rebranded. La-fe is a separate business with its own repository and live database. Nothing here should point at, copy from or write to La-fe's.
 
-## 1. Brand Identity
+## The business
 
-- Business name: **La-fe Beauty Parlor**
-- Tagline: **"Your Beauty Is Our Priority"**
+| | |
+| --- | --- |
+| Owner and only stylist | Kegomoditse Faith Diale |
+| Phone / WhatsApp | 073 979 0375 (second line: 073 070 0375, calls only) |
+| Email | faithdiale4@gmail.com |
+| Address | 2389 Rangaka Street, Tlhabane, 0309 (North West) |
+| Hours | Monday – Sunday, 08:30 – 18:00 (also the booking window) |
 
-Color palette:
+Still to come from the owner (marked `TODO(client)` in the code): the website domain (`SALON_SITE_URL` is still La-fe's), social media links, and client testimonials.
 
-| Name           | Hex       |
-| -------------- | --------- |
+## Where things live
+
+Each of these is the **one copy**. Import from them; never re-declare a value elsewhere.
+
+- `lib/salon-contact.ts`: name, phone, email, address, map, hours, socials, WhatsApp links. `lib/models/Settings.ts` holds the same details as the dashboard's defaults and is kept in step by hand.
+- `lib/salon-services.ts`: services, prices and durations. Drives `/`, `/services`, and (through `npm run seed`) the database the booking wizard reads.
+- `lib/salon-assets.ts`: every photo slot and the logo. The studio's photos are in `public/Touched-by-services/`; the logo is `public/logo/touchedbyfaithdee-logo.png`.
+- `features/services/schema.ts`: service categories (`Makeup`, `Hair`, `Combos`). Must match `SalonServiceCategory`.
+
+## Services (owner, 2026-10-27)
+
+| Service | Category | Price |
+| --- | --- | --- |
+| Occasional makeup | Makeup | R750 |
+| Matric dance makeup | Makeup | R750 |
+| Bridal Makeup and Go | Makeup | R1 700 |
+| Bridal Full Day | Makeup | R3 700 (whole day: opening to closing) |
+| Basic hair installation | Hair | R300 |
+| Frontal ponytail (own fibre) | Hair | R600 |
+| Messy updo bun | Hair | R850 |
+
+Every other service is a 2-hour appointment. `price: null` shows "Price on request", never R0.
+
+## Database
+
+- `MONGODB_URI` (in `.env`, never committed) must name the database in its path: `…mongodb.net/touchedbyfaithdee`. `scripts/db-env.ts` refuses to run any script against a database whose name doesn't contain `touchedbyfaithdee`.
+- `npm run seed` upserts the services from `lib/salon-services.ts` and the owner login (`OWNER_EMAIL` / `OWNER_NAME`). It never deletes; remove a service in the dashboard or by hand.
+- Stylists are managed in the dashboard, not seeded. Faith's service list is empty, which the booking wizard reads as "offers every service".
+- The service list is cached on disk (`unstable_cache`, 5 minutes). After changing the database outside the app, clear `.next/dev/cache/fetch-cache` (dev) or `.next/cache/fetch-cache` (build). A dev server started before `.env` changed keeps its old connection, so restart it.
+
+## Brand
+
+- Logo: gold script wordmark "Touchedbyfaithdee" with a star, shown with a small "STUDIO" caption.
+- Palette (`app/globals.css`; the hero and services sections use it through `components/site/la-fe-brand.tsx`, an internal name):
+
+| Name | Hex |
+| --- | --- |
 | Champagne Gold | `#B08A43` |
-| Warm Ivory     | `#F8EEDF` |
-| Rose Gold      | `#C78E7B` |
+| Warm Ivory | `#F8EEDF` |
+| Rose Gold | `#C78E7B` |
 | Espresso Black | `#211A12` |
-| White          | `#FFFFFF` |
+| White | `#FFFFFF` |
 
-Apply the colors consistently to the existing branding elements, such as the logo area, brand accents, and hero section.
+- The logo's own gold is `#C69100` (the tab icon's star uses it).
+- Tagline in use: "Your Beauty Is Our Priority". It came from La-fe's poster; confirm or replace with the owner.
 
-## 2. Update the Hero Section
+## Rules
 
-Transform the existing hero section into a premium beauty salon design inspired by the supplied promotional poster.
-
-- Use the La-fe Beauty Parlor logo.
-- Feature beautiful, relevant lash and beauty imagery.
-- Display the headline: "Enhance Your Beauty".
-- Include the tagline: "Your Beauty Is Our Priority".
-- Add a short description highlighting the salon's beauty services.
-- Keep the existing call-to-action buttons and booking links working.
-- Use an elegant ivory background with champagne-gold and rose-gold accents.
-- Maintain a clean, luxurious, feminine aesthetic.
-- Make the hero responsive on mobile, tablet, and desktop.
-- Use the supplied image assets if they already exist in the project. Do not invent file paths.
-
-## 3. Strict Restrictions
-
-- Do not rebuild or restructure the application.
-- Do not change the framework, database, API routes, authentication, or business logic.
-- Do not modify the booking system, dashboard, services, pricing, or customer data.
-- Do not change existing routes or URLs.
-- Do not install new packages.
-- Do not modify unrelated pages or components.
-- Do not remove existing features.
-- Do not deploy the application.
-
-## 4. Implementation Instructions
-
-First, inspect the existing code and identify the current brand elements and hero component.
-
-Then make the smallest possible changes to update the branding and hero section. Reuse existing components, styles, and image assets wherever possible.
-
-After making the changes, run the available checks and confirm that the existing booking functionality and navigation remain unchanged.
-
-**Final goal:** The existing application should retain its current functionality and structure, but its branding and hero section should look like La-fe Beauty Parlor, matching the supplied visual references.
+- Never invent business facts: prices, contact details, policies (no "house calls" or deposits unless the owner confirms them), ratings, reviews or testimonials. Ask, or leave the `TODO(client)` in place.
+- Photos labelled as the studio's work (gallery, service photos) must be the studio's own. Describe what each photo shows in its `alt`.
+- Don't install new packages, change the framework, or restructure the app without being asked.
+- Don't deploy. Hosting needs the same environment variables as `.env`.
+- Run `npx tsc --noEmit -p .` and `npx eslint` on changed files before handing work back.
