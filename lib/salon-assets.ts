@@ -30,12 +30,22 @@ const photo = {
      "Take a look inside" frame (2026-10-27). */
   interiorWashBay: { src: own("interior-1.jpg"), alt: "Salon interior with a lit arch over two black wash chairs, gold-trimmed styling chairs and arched mirrors" },
   interiorMirror: { src: own("interior-2.jpg"), alt: "Cream styling chair in front of a curved, back-lit mirror, with lit shelves of hair products" },
+  /* 3:2 landscape — the About video's cover. */
+  makeupRoom: { src: own("About us 1.jpg"), alt: "Makeup room with gold-framed olive director's chairs at a lit mirror, ring lights, a grey sofa with pink cushions and rose-gold balloons on the ceiling" },
 } satisfies Record<string, ImageSlot>
 
 export const salonImages = {
-  /** Wordmark, gold script on transparent (452×150) — header, hero, login
-      card, dashboard sidebar. Cut from the owner's logo (logo/logo.png). */
-  logo: { src: "/logo/touchedbyfaithdee-logo.png", alt: "Touchedbyfaithdee Studio logo" },
+  /** The studio's logo — pink script wordmark with a star, a brush stroke
+      and a fan of makeup brushes — on transparent, trimmed. Header, hero,
+      footer, login card, dashboard sidebar. Cut from the owner's
+      Touched-by-services/Really-logo.png (2026-10-27), which has a white
+      background. The earlier gold wordmark is logo/touchedbyfaithdee-logo.png. */
+  logo: {
+    src: "/logo/touchedbyfaithdee-logo-pink.png",
+    alt: "Touchedbyfaithdee Studio logo",
+    width: 1011,
+    height: 248,
+  },
 
   /** Kept for lib/stock-photos.ts — the hero photo. */
   hero: photo.basicInstall,
@@ -54,11 +64,13 @@ export const salonImages = {
   /** Login backdrop. */
   salonStation: photo.occasion2,
 
-  /** About section ("Take a look inside"): main frame (4:3 crop of a
-      portrait) and the square inset that overlaps it. */
+  /** About section ("Take a look inside"): main frame, which is also the
+      cover of the studio's tour video (1280×720, 5 s) that plays in it, and
+      the square inset that overlaps it. */
   about: {
-    main: photo.interiorWashBay,
+    main: photo.makeupRoom,
     inset: photo.interiorMirror,
+    video: own("about us video.mp4"),
   },
 
   /** The hero's portrait — alone on phones, bottom-left of the collage on

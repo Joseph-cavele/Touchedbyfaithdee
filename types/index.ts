@@ -92,7 +92,10 @@ export interface DashboardStats {
   /** From CONFIRMED / PENDING appointments — booked, not yet done. */
   bookedRevenue: number
   totalAppointments: number
+  /** Appointments dated today (not cancelled). */
   todaysAppointments: number
+  /** Bookings made today, whatever date they're for (not cancelled). */
+  bookedToday: number
   pendingAppointments: number
   stylistCount: number
 }

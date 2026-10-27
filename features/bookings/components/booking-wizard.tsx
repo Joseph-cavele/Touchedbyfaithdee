@@ -291,7 +291,7 @@ export function BookingWizard({
             setStep(0)
             setSubmitted(false)
           }}
-          className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-on-accent hover:bg-brand-accent/90"
+          className="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-on-accent hover:bg-brand-accent-hover"
         >
           Book another appointment
         </button>
@@ -457,7 +457,7 @@ export function BookingWizard({
             <button
               type="button"
               onClick={goNext}
-              className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-on-accent hover:bg-brand-accent/90"
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-on-accent hover:bg-brand-accent-hover"
             >
               Continue
               <ArrowRight className="size-4" />
@@ -476,7 +476,7 @@ export function BookingWizard({
                   "inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-semibold transition-colors disabled:opacity-60",
                   ONLINE_PAYMENTS_ENABLED
                     ? "border border-brand-line text-brand-text hover:border-brand-accent hover:text-brand-accent-ink"
-                    : "bg-brand-accent text-brand-on-accent hover:bg-brand-accent/90"
+                    : "bg-brand-accent text-brand-on-accent hover:bg-brand-accent-hover"
                 )}
               >
                 {pendingMethod === "IN_PERSON" && (
@@ -490,7 +490,7 @@ export function BookingWizard({
                 type="button"
                 disabled={busy}
                 onClick={submitWith("ONLINE")}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-on-accent shadow-[0_4px_20px_-5px_color-mix(in_srgb,var(--lz-gold)_35%,transparent)] transition-colors hover:bg-brand-accent/90 disabled:opacity-60"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-on-accent shadow-[0_4px_20px_-5px_color-mix(in_srgb,var(--lz-gold)_35%,transparent)] transition-colors hover:bg-brand-accent-hover disabled:opacity-60"
               >
                 {pendingMethod === "ONLINE" ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -633,7 +633,7 @@ function ServiceStep({
               <button
                 type="button"
                 onClick={onRetry}
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-accent px-4 text-xs font-semibold text-brand-on-accent hover:bg-brand-accent/90"
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-accent px-4 text-xs font-semibold text-brand-on-accent hover:bg-brand-accent-hover"
               >
                 Retry
               </button>
@@ -763,7 +763,7 @@ function StaffStep({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-accent px-4 text-xs font-semibold text-brand-on-accent hover:bg-brand-accent/90"
+            className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand-accent px-4 text-xs font-semibold text-brand-on-accent hover:bg-brand-accent-hover"
           >
             Retry
           </button>

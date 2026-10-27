@@ -33,9 +33,9 @@ function SidebarBrand() {
       <NextImage
         src={salonImages.logo.src}
         alt=""
-        width={452}
-        height={150}
-        className="h-10 w-auto"
+        width={salonImages.logo.width}
+        height={salonImages.logo.height}
+        className="h-11 w-auto"
       />
       <span className="text-brand-accent-ink -mt-1 text-[9px] font-semibold tracking-[0.28em]">
         STUDIO

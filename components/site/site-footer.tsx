@@ -43,9 +43,9 @@ export function SiteFooter() {
           <NextImage
             src={salonImages.logo.src}
             alt={SALON_NAME}
-            width={452}
-            height={150}
-            className="h-12 w-auto"
+            width={salonImages.logo.width}
+            height={salonImages.logo.height}
+            className="h-14 w-auto"
           />
           <span className="-mt-1 font-ui text-[10px] font-semibold tracking-[0.3em] text-brand-accent-ink uppercase md:self-end">
             Studio

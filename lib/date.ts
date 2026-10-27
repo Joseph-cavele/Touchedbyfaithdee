@@ -6,12 +6,15 @@
 // the dashboard's "today's appointments" count wrong.
 const SALON_TIMEZONE = process.env.SALON_TIMEZONE || "Africa/Johannesburg"
 
+/** The salon-local calendar date of an instant, as a "YYYY-MM-DD" string. */
+export function salonDateOf(instant: Date): string {
+  // en-CA formats as YYYY-MM-DD, which matches how bookingDate is stored.
+  return new Intl.DateTimeFormat("en-CA", { timeZone: SALON_TIMEZONE }).format(instant)
+}
+
 /** Today's date in the salon's timezone as a "YYYY-MM-DD" string. */
 export function salonToday(): string {
-  // en-CA formats as YYYY-MM-DD, which matches how bookingDate is stored.
-  return new Intl.DateTimeFormat("en-CA", { timeZone: SALON_TIMEZONE }).format(
-    new Date()
-  )
+  return salonDateOf(new Date())
 }
 
 /**

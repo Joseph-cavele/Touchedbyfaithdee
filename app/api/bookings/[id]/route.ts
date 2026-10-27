@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { formatTotal } from "@/lib/currency"
 import { revalidateTag } from "next/cache"
+import { isValidObjectId } from "mongoose"
 import { connectDB } from "@/lib/db"
 import { BookingModel } from "@/lib/models/Booking"
+import { BookingImageModel } from "@/lib/models/BookingImage"
 import { NotificationModel } from "@/lib/models/Notification"
 import { updateBookingStatusSchema } from "@/features/bookings/schema"
 import { emailFrom, EMAIL_REPLY_TO, resend } from "@/lib/resend"
@@ -113,4 +115,36 @@ export async function PATCH(
   }
 
   return NextResponse.json({ id, status, emailSent })
+}
+
+/* Removes a booking for good (test bookings, duplicates, mistakes). No
+   email goes out — to tell the customer, cancel instead (PATCH above). */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = await requireOwner()
+  if (denied) return denied
+
+  const { id } = await params
+  if (!isValidObjectId(id)) {
+    return NextResponse.json({ error: "Booking not found" }, { status: 404 })
+  }
+
+  await connectDB()
+  const booking = await BookingModel.findByIdAndDelete(id)
+
+  if (!booking) {
+    return NextResponse.json({ error: "Booking not found" }, { status: 404 })
+  }
+
+  // Nothing else should point at a booking that no longer exists.
+  await Promise.all([
+    NotificationModel.deleteMany({ bookingId: id }),
+    BookingImageModel.deleteMany({ bookingId: id }),
+  ])
+
+  revalidateTag("dashboard", { expire: 0 })
+
+  return NextResponse.json({ id })
 }

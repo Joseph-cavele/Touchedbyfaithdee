@@ -19,7 +19,7 @@ export function weMissYouEmailHtml({ customerName, serviceNames, bookUrl, unsubs
       <p>Hi ${escapeHtml(customerName)}, it's been two weeks since you visited us${last} — we miss you!</p>
       <p>Whenever you're ready for your next look, we'd love to have you back at ${SALON_NAME}. Your beauty is our priority.</p>
       <p style="margin: 24px 0; text-align: center;">
-        <a href="${escapeHtml(bookUrl)}" style="display: inline-block; padding: 12px 28px; background: ${c.gold}; color: ${c.black}; border-radius: 999px; font-weight: bold; text-decoration: none;">Book your next visit</a>
+        <a href="${escapeHtml(bookUrl)}" style="display: inline-block; padding: 12px 28px; background: ${c.pink}; color: #FFFFFF; border-radius: 999px; font-weight: bold; text-decoration: none;">Book your next visit</a>
       </p>
       <p style="color: ${c.muted}; font-size: 12px;">Don't want these reminders? <a href="${escapeHtml(unsubscribeUrl)}" style="color: ${c.muted};">Unsubscribe</a> — you'll still get your appointment confirmations.</p>
   `)

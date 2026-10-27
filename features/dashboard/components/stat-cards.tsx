@@ -40,6 +40,8 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
     {
       label: "Today's appointments",
       value: stats.todaysAppointments.toLocaleString(),
+      // Bookings made today, for any date — often later in the week.
+      detail: `${stats.bookedToday.toLocaleString()} booked today`,
       icon: CalendarClock,
       tint: "bg-primary/12 text-brand-accent-ink",
     },

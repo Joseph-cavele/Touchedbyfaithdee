@@ -27,7 +27,7 @@ export function loginCodeEmailHtml({ code, minutes, purpose = "login" }: LoginCo
       <h2 style="margin-top: 0;">${copy.heading}</h2>
       <p>${copy.intro}</p>
       <p style="margin: 24px 0; text-align: center;">
-        <span style="display: inline-block; padding: 14px 24px; border: 1px solid ${c.gold}; border-radius: 12px; font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold; letter-spacing: 10px; color: ${c.text};">${code}</span>
+        <span style="display: inline-block; padding: 14px 24px; border: 1px solid ${c.pink}; border-radius: 12px; font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold; letter-spacing: 10px; color: ${c.text};">${code}</span>
       </p>
       <p>It expires in ${minutes} minutes and works once.</p>
       <p style="color: ${c.muted}; font-size: 13px;">${copy.ignore}</p>

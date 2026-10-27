@@ -83,9 +83,9 @@ export function SiteHero() {
             <NextImage
               src={salonImages.logo.src}
               alt={salonImages.logo.alt}
-              width={452}
-              height={150}
-              className="h-14 w-auto sm:h-16"
+              width={salonImages.logo.width}
+              height={salonImages.logo.height}
+              className="h-16 w-auto sm:h-20"
             />
             <span className="-mt-1 font-ui text-[9px] font-semibold tracking-[0.28em] text-[var(--lf-gold-ink)] uppercase">
               Studio
@@ -164,7 +164,7 @@ export function SiteHero() {
           >
             <Link
               href="/book"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--lf-gold)] px-8 py-3.5 font-ui text-sm font-semibold text-[var(--lf-ink)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-12px_color-mix(in_srgb,var(--lf-gold)_90%,transparent)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--lf-gold-ink)] active:translate-y-0"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--lf-gold)] px-8 py-3.5 font-ui text-sm font-semibold text-[var(--lf-white)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-12px_color-mix(in_srgb,var(--lf-gold)_90%,transparent)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--lf-gold-ink)] active:translate-y-0"
             >
               Book appointment
               <Sparkles className="size-4" aria-hidden />

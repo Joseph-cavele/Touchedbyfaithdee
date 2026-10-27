@@ -13,12 +13,12 @@ function page(title: string, body: string, status = 200) {
   return new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} — ${SALON_NAME}</title></head>
-<body style="margin:0;background:#F8EEDF;font-family:Georgia,serif;color:#211A12;display:grid;place-items:center;min-height:100vh;padding:24px">
-<main style="max-width:420px;text-align:center;background:#fff;border:1px solid #e6d6b8;border-radius:20px;padding:32px">
-<p style="letter-spacing:.25em;font-size:11px;color:#7e6332;text-transform:uppercase;margin:0">${SALON_NAME}</p>
+<body style="margin:0;background:#FFF5F8;font-family:Georgia,serif;color:#242124;display:grid;place-items:center;min-height:100vh;padding:24px">
+<main style="max-width:420px;text-align:center;background:#fff;border:1px solid #F0DCE4;border-radius:20px;padding:32px">
+<p style="letter-spacing:.25em;font-size:11px;color:#880E4F;text-transform:uppercase;margin:0">${SALON_NAME}</p>
 <h1 style="font-weight:500;margin:12px 0">${title}</h1>
 <p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6">${body}</p>
-<p style="font-family:Arial,sans-serif;font-size:14px"><a href="/" style="color:#7e6332">Back to the website</a></p>
+<p style="font-family:Arial,sans-serif;font-size:14px"><a href="/" style="color:#880E4F">Back to the website</a></p>
 </main></body></html>`,
     { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
   )

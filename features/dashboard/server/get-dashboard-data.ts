@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache"
 import { connectDB } from "@/lib/db"
-import { salonToday } from "@/lib/date"
+import { salonDateOf, salonToday } from "@/lib/date"
 import { BookingModel } from "@/lib/models/Booking"
 import { StylistModel } from "@/lib/models/Stylist"
 import type { DashboardData } from "@/types"
@@ -75,6 +75,11 @@ async function fetchDashboardData(): Promise<DashboardData> {
   const todaysAppointments = realBookings.filter(
     (b) => b.bookingDate === todayStr && b.status !== "CANCELLED"
   ).length
+  // Made today, for any date — so a booking taken today shows up on the
+  // card even when the appointment itself is later in the week.
+  const bookedToday = realBookings.filter(
+    (b) => salonDateOf(new Date(b.createdAt)) === todayStr && b.status !== "CANCELLED"
+  ).length
   const pendingAppointments = realBookings.filter((b) => b.status === "PENDING").length
 
   // Monthly bookings for the last 6 months, oldest first.
@@ -142,6 +147,7 @@ async function fetchDashboardData(): Promise<DashboardData> {
       bookedRevenue,
       totalAppointments,
       todaysAppointments,
+      bookedToday,
       pendingAppointments,
       stylistCount,
     },
@@ -159,6 +165,6 @@ async function fetchDashboardData(): Promise<DashboardData> {
  */
 export const getDashboardData = unstable_cache(
   fetchDashboardData,
-  ["dashboard-data-v2"],
+  ["dashboard-data-v3"],
   { tags: ["dashboard"], revalidate: 60 }
 )

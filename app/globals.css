@@ -17,35 +17,39 @@
   --font-ui: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
 
   /* ────────────────────────────────────────────────────────────────────
-     Salon palette — warm ivory, champagne gold, rose gold,
-     espresso black and white.
+     Salon palette — dark pink, after the studio's pink logo.
 
      The brand values are defined ONCE, as --lz-* on :root below, and
      everything else (these utilities and the shadcn tokens the dashboard
      reads) points at them. Change a colour there and the whole app follows.
+     (The --lz-gold / --lz-rose / --lz-ivory / --lz-espresso names date from
+     the earlier gold palette; they now hold the pinks below.)
 
-       brand-bg          page ground — Warm Ivory           #F8EEDF
-       brand-surface     cards, header, panels — White      #FFFFFF
-       brand-accent      Champagne Gold — FILLS, borders, icons  #B08A43
-       brand-accent-ink  gold darkened with espresso — gold TEXT
-       brand-rose        Rose Gold — ornaments, soft tints  #C78E7B
-       brand-text        headings and body — Espresso Black #211A12
-       brand-muted       secondary text (espresso into ivory)
-       brand-line        hairlines and soft fills (gold tinted into surface)
-       brand-glass       espresso panels (footer, login, booking summary)
-       brand-on-accent   text sitting ON gold — espresso, never white
+       brand-bg            page ground — Light pink         #FFF5F8
+       brand-surface       cards, header, panels — White    #FFFFFF
+       brand-accent        Primary dark pink — FILLS, borders, icons  #C2185B
+       brand-accent-hover  Dark pink hover — fills on hover #880E4F
+       brand-accent-ink    pink TEXT — the dark pink        #880E4F
+       brand-rose          Soft pink — ornaments, soft tints #F8BBD0
+       brand-text          headings and body — Main text    #242124
+       brand-muted         secondary text                   #6B6267
+       brand-line          hairlines and soft fills — Borders #F0DCE4
+       brand-glass         dark panels (footer, login, booking summary) #242124
+       brand-on-accent     text sitting ON pink — white
 
-     Contrast (WCAG 2.x): espresso on ivory ≈ 15:1, muted on white ≈ 7.5:1,
-     espresso on gold ≈ 5.4:1, accent-ink on ivory ≈ 4.9:1. Pure gold on
-     ivory is only ≈ 2.8:1 and FAILS as text — hence brand-accent-ink.
+     Contrast (WCAG 2.x): text on light pink ≈ 15:1, muted on white ≈ 6:1,
+     white on primary ≈ 5.9:1, accent-ink on light pink ≈ 9:1 (and ≈ 7:1 on
+     the brand-line fill, where the primary would only reach ≈ 4.5:1).
+     Dark text on the primary is only ≈ 2.7:1 — hence white on-accent.
 
      Dark islands: put `dark` on an element (the footer, the login card, the
-     booking summary) and every token inside it resolves to the espresso set
-     further down, so brand-text turns ivory and accent-ink turns gold.
+     booking summary) and every token inside it resolves to the dark set
+     further down, so brand-text turns light pink and accent-ink soft pink.
      ──────────────────────────────────────────────────────────────────── */
   --color-brand-bg: var(--lz-bg);
   --color-brand-surface: var(--lz-surface);
   --color-brand-accent: var(--lz-gold);
+  --color-brand-accent-hover: var(--lz-gold-hover);
   --color-brand-accent-ink: var(--lz-gold-ink);
   --color-brand-rose: var(--lz-rose);
   --color-brand-text: var(--lz-text);
@@ -92,33 +96,34 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   La-fe theme. The site is light (ivory) by default; `.dark` marks the
-   espresso islands. The shadcn block underneath is declared for both
+   Salon theme. The site is light (light pink) by default; `.dark` marks
+   the dark islands. The shadcn block underneath is declared for both
    selectors so its var() references re-resolve inside an island instead of
    inheriting the light values computed on :root.
 
    --destructive stays red on purpose: it has to remain distinguishable from
-   the gold primary, or a delete button reads as a CTA.
+   the pink primary, or a delete button reads as a CTA.
    ══════════════════════════════════════════════════════════════════════ */
 :root {
   /* The brand palette — the only place these values appear.
      (components/site/la-fe-brand.tsx points its --lf-* names at these.) */
-  --lz-ivory: #f8eedf;
+  --lz-ivory: #fff5f8;
   --lz-bg: var(--lz-ivory);
   --lz-surface: #ffffff;
-  --lz-gold: #b08a43;
-  --lz-rose: #c78e7b;
-  --lz-text: #211a12;
-  --lz-espresso: #211a12;
+  --lz-gold: #c2185b;
+  --lz-gold-hover: #880e4f;
+  --lz-rose: #f8bbd0;
+  --lz-text: #242124;
+  --lz-espresso: #242124;
+  --lz-muted: #6b6267;
+  --lz-line: #f0dce4;
+  --lz-on-accent: #ffffff;
+  --lz-gold-ink: var(--lz-gold-hover);
   /* Derived, not new colours. */
-  --lz-muted: color-mix(in srgb, var(--lz-text) 72%, var(--lz-bg));
-  --lz-gold-ink: color-mix(in srgb, var(--lz-gold) 65%, var(--lz-text));
   --lz-blush: color-mix(in srgb, var(--lz-rose) 18%, var(--lz-surface));
-  --lz-line: color-mix(in srgb, var(--lz-gold) 28%, var(--lz-surface));
   --lz-raised: color-mix(in srgb, var(--lz-gold) 8%, var(--lz-surface));
   --lz-glass: var(--lz-espresso);
-  --lz-on-accent: var(--lz-espresso);
-  --lz-border: color-mix(in srgb, var(--lz-text) 12%, transparent);
+  --lz-border: var(--lz-line);
   --lz-input: color-mix(in srgb, var(--lz-text) 18%, transparent);
   --lz-destructive: oklch(0.577 0.245 27.325);
   color-scheme: light;
@@ -129,13 +134,14 @@
   --lz-surface: color-mix(in srgb, #ffffff 6%, var(--lz-espresso));
   --lz-text: var(--lz-ivory);
   --lz-muted: color-mix(in srgb, var(--lz-ivory) 70%, var(--lz-espresso));
-  /* Pure gold reads at ≈ 5.4:1 on espresso, so it is its own text tone. */
-  --lz-gold-ink: var(--lz-gold);
+  /* The primary is only ≈ 2.6:1 on the dark ground, so pink TEXT here is
+     the soft pink (≈ 9.6:1). Pink fills keep the primary, with white text. */
+  --lz-gold-ink: var(--lz-rose);
   --lz-blush: color-mix(in srgb, var(--lz-rose) 18%, var(--lz-surface));
   --lz-line: color-mix(in srgb, var(--lz-gold) 22%, var(--lz-surface));
   --lz-raised: color-mix(in srgb, var(--lz-text) 7%, var(--lz-surface));
   --lz-glass: var(--lz-espresso);
-  --lz-on-accent: var(--lz-espresso);
+  --lz-on-accent: #ffffff;
   --lz-border: oklch(1 0 0 / 12%);
   --lz-input: oklch(1 0 0 / 18%);
   --lz-destructive: oklch(0.704 0.191 22.216);
@@ -188,6 +194,18 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind v4 leaves buttons on the default arrow cursor; anything
+     clickable shows the pointer, disabled controls keep the arrow. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"],
+  [role="menuitem"],
+  [role="option"],
+  summary,
+  label[for],
+  select:not(:disabled) {
+    cursor: pointer;
+  }
 }
 
 /* Reference-site hero micro-interactions (CSS-only port of its inline JS) */
@@ -236,7 +254,7 @@
   letter-spacing: -0.005em;
 }
 
-/* A short gold hairline under every card title, as under the site's
+/* A short pink hairline under every card title, as under the site's
    section headings. */
 .lafe-dash [data-slot="card-title"]::after {
   content: "";

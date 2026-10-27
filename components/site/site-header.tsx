@@ -82,10 +82,10 @@ export function SiteHeader({
             <NextImage
               src={LOGO_MARK}
               alt=""
-              width={452}
-              height={150}
+              width={salonImages.logo.width}
+              height={salonImages.logo.height}
               priority
-              className="h-9 w-auto sm:h-11"
+              className="h-10 w-auto sm:h-12"
             />
           ) : (
             <span

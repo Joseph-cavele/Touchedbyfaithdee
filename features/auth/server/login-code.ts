@@ -4,7 +4,7 @@ import { connectDB } from "@/lib/db"
 import { LoginCodeModel } from "@/lib/models/LoginCode"
 import { SettingsModel } from "@/lib/models/Settings"
 import { UserModel } from "@/lib/models/User"
-import { ownerEmailFromEnv, ownerNameFromEnv } from "@/lib/owner-account"
+import { developerEmailFromEnv, ownerEmailFromEnv, ownerNameFromEnv } from "@/lib/owner-account"
 import { emailFrom, resend } from "@/lib/resend"
 import { loginCodeEmailHtml } from "@/emails/login-code"
 
@@ -13,8 +13,9 @@ import { loginCodeEmailHtml } from "@/emails/login-code"
 
    Who can sign in: the OWNER — Settings.ownerLoginEmail, or OWNER_EMAIL
    from .env while that is empty (lib/owner-account.ts) — plus anyone the
-   owner adds under Settings → Dashboard access (Settings.dashboardUsers).
-   Nobody else can even request a code.
+   owner adds under Settings → Dashboard access (Settings.dashboardUsers),
+   plus DEVELOPER_EMAIL from .env when set. Nobody else can even request a
+   code.
 
    Sign in   requestLoginCode → code emailed to that address →
              verifyLoginCode (from the Credentials provider in auth.ts).
@@ -63,9 +64,15 @@ export async function getDashboardUsers(): Promise<DashboardUser[]> {
   return (settings?.dashboardUsers ?? []).map((u) => ({ name: u.name, email: normalizeEmail(u.email) }))
 }
 
-/** True when `email` may sign in: the owner, or on the owner's access list. */
+/** True when `email` is DEVELOPER_EMAIL from .env. */
+function isDeveloperEmail(email: string) {
+  const developer = developerEmailFromEnv()
+  return developer !== "" && normalizeEmail(email) === developer
+}
+
+/** True when `email` may sign in: the owner, the developer, or on the owner's access list. */
 export async function isAllowedEmail(email: string) {
-  if (await isOwnerEmail(email)) return true
+  if (isDeveloperEmail(email) || (await isOwnerEmail(email))) return true
   const wanted = normalizeEmail(email)
   return (await getDashboardUsers()).some((u) => u.email === wanted)
 }
@@ -116,9 +123,10 @@ export async function ensureOwnerUser(rawEmail: string) {
   await connectDB()
   const email = normalizeEmail(rawEmail)
   const listed = (await getDashboardUsers()).find((u) => u.email === email)
+  const name = listed?.name || (isDeveloperEmail(email) ? "Developer" : ownerNameFromEnv())
   return UserModel.findOneAndUpdate(
     { email },
-    { $setOnInsert: { email, name: listed?.name || ownerNameFromEnv(), role: "owner" } },
+    { $setOnInsert: { email, name, role: "owner" } },
     { upsert: true, returnDocument: "after" }
   )
 }
@@ -157,13 +165,18 @@ async function issueCode(email: string, purpose: Purpose): Promise<IssueResult> 
     expiresAt: new Date(Date.now() + CODE_TTL_MS),
   })
 
+  // In development, when the email can't go out (no RESEND_API_KEY, or Resend
+  // rejects it — e.g. an unverified sender domain), print the code so the
+  // flow can still be tested locally. Never in production — that would leak
+  // it to logs.
+  const printInDev = (why: string) => {
+    if (process.env.NODE_ENV === "production") return false
+    console.log(`🔑 Dashboard ${purpose} code for ${email}: ${code} (${why}, so not emailed)`)
+    return true
+  }
+
   if (!resend) {
-    // No RESEND_API_KEY: in development, print the code so the flow can still
-    // be tested locally. Never in production — that would leak it to logs.
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`🔑 Dashboard ${purpose} code for ${email}: ${code} (RESEND_API_KEY not set, so not emailed)`)
-      return { ok: true }
-    }
+    if (printInDev("RESEND_API_KEY not set")) return { ok: true }
     console.error("Code not sent: RESEND_API_KEY is not set")
     return { ok: false, reason: "send_failed" }
   }
@@ -181,11 +194,13 @@ async function issueCode(email: string, purpose: Purpose): Promise<IssueResult> 
     })
     if (error) {
       console.error("Code email rejected by Resend:", error)
+      if (printInDev("Resend rejected the email")) return { ok: true }
       await LoginCodeModel.deleteMany({ email, purpose })
       return { ok: false, reason: "send_failed" }
     }
   } catch (err) {
     console.error("Failed to send code email", err)
+    if (printInDev("sending failed")) return { ok: true }
     await LoginCodeModel.deleteMany({ email, purpose })
     return { ok: false, reason: "send_failed" }
   }

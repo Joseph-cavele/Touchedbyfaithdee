@@ -24,7 +24,7 @@ Each of these is the **one copy**. Import from them; never re-declare a value el
 
 - `lib/salon-contact.ts`: name, phone, email, address, map, hours, socials, WhatsApp links. `lib/models/Settings.ts` holds the same details as the dashboard's defaults and is kept in step by hand.
 - `lib/salon-services.ts`: services, prices and durations. Drives `/`, `/services`, and (through `npm run seed`) the database the booking wizard reads.
-- `lib/salon-assets.ts`: every photo slot and the logo. The studio's photos are in `public/Touched-by-services/`; the logo is `public/logo/touchedbyfaithdee-logo.png`.
+- `lib/salon-assets.ts`: every photo slot and the logo. The studio's photos are in `public/Touched-by-services/`; the logo is `public/logo/touchedbyfaithdee-logo-pink.png`.
 - `features/services/schema.ts`: service categories (`Makeup`, `Hair`, `Combos`). Must match `SalonServiceCategory`.
 
 ## Services (owner, 2026-10-27)
@@ -50,7 +50,7 @@ Every other service is a 2-hour appointment. `price: null` shows "Price on reque
 
 ## Brand
 
-- Logo: gold script wordmark "Touchedbyfaithdee" with a star, shown with a small "STUDIO" caption.
+- Logo (owner, 2026-10-27): pink script wordmark "Touchedbyfaithdee" with a star, a brush stroke and a fan of makeup brushes, shown with a small "STUDIO" caption. `public/logo/touchedbyfaithdee-logo-pink.png` is cut from her `Really-logo.png` (white background) onto transparent. The older gold wordmark (`touchedbyfaithdee-logo.png`) is no longer used.
 - Palette (`app/globals.css`; the hero and services sections use it through `components/site/la-fe-brand.tsx`, an internal name):
 
 | Name | Hex |
@@ -61,7 +61,7 @@ Every other service is a 2-hour appointment. `price: null` shows "Price on reque
 | Espresso Black | `#211A12` |
 | White | `#FFFFFF` |
 
-- The logo's own gold is `#C69100` (the tab icon's star uses it).
+- The logo's pink is about `#FF0090`. The gold wordmark's `#C69100` is still the tab icon's star.
 - Tagline in use: "Your Beauty Is Our Priority". It came from La-fe's poster; confirm or replace with the owner.
 
 ## Rules

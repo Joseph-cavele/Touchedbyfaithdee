@@ -12,12 +12,12 @@ import { SALON_HOURS, SALON_NAME } from "@/lib/salon-contact"
 import { salonServices, serviceCategories } from "@/lib/salon-services"
 
 /* ══════════════════════════════════════════════════════════════════════
-   VIDEO SLOT — drop an mp4/webm in /public/videos and set the path here.
-   While it's "", the play button renders but is disabled rather than
-   clickable: a play control that does nothing when pressed is a broken
-   promise to the visitor, not a placeholder.
+   VIDEO SLOT — the studio's tour video, set in lib/salon-assets.ts
+   (salonImages.about.video). If it's ever "", the play button renders but
+   is disabled rather than clickable: a play control that does nothing when
+   pressed is a broken promise to the visitor, not a placeholder.
    ══════════════════════════════════════════════════════════════════════ */
-const VIDEO_SRC = ""
+const VIDEO_SRC = salonImages.about.video
 
 /* Every figure here is derived from real data — the service list and the
    opening hours. Do not add years in business, client counts or awards until
@@ -73,9 +73,11 @@ export function SiteAbout() {
             {playing && VIDEO_SRC ? (
               <video
                 src={VIDEO_SRC}
+                poster={salonImages.about.main.src}
                 controls
                 autoPlay
                 playsInline
+                aria-label={`Tour of ${SALON_NAME}`}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -94,9 +96,9 @@ export function SiteAbout() {
                     alt={salonImages.about.main.alt}
                     fill
                     sizes="(min-width: 1024px) 45vw, 90vw"
-                    // Portrait photo in a landscape frame: anchored on the lit
-                    // arch and wash chairs rather than the ceiling.
-                    className="object-cover object-[50%_45%]"
+                    // 3:2 photo in a 4:3 frame: only the sides are trimmed,
+                    // so the chairs and mirror stay centred.
+                    className="object-cover object-center"
                   />
                 </motion.div>
 

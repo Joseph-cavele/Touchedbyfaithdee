@@ -278,7 +278,7 @@ export function SignInCard2({
                   transition={{ type: "spring", duration: 0.8 }}
                   className="relative mx-auto w-fit"
                 >
-                  {/* Halo behind the wordmark, so the gold lifts off the glass. */}
+                  {/* Halo behind the logo, so it lifts off the glass. */}
                   <motion.span
                     aria-hidden
                     className="bg-brand-accent/25 absolute -inset-x-4 -inset-y-1 rounded-full blur-xl"
@@ -288,10 +288,10 @@ export function SignInCard2({
                   <NextImage
                     src={LOGO_MARK}
                     alt={salonImages.logo.alt}
-                    width={452}
-                    height={150}
+                    width={salonImages.logo.width}
+                    height={salonImages.logo.height}
                     priority
-                    className="relative h-14 w-auto"
+                    className="relative h-16 w-auto"
                   />
                 </motion.h1>
 

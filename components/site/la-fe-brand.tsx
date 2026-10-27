@@ -23,7 +23,9 @@ export const laFePalette = {
   "--lf-white": "#FFFFFF",
   "--lf-cream": "color-mix(in srgb, var(--lf-ivory) 55%, var(--lf-white))",
   "--lf-gold-ink": "color-mix(in srgb, var(--lf-gold) 65%, var(--lf-ink))",
-  "--lf-rose-ink": "color-mix(in srgb, var(--lf-rose) 80%, var(--lf-ink))",
+  /* The soft pink is too light to darken into readable text (≈2.4:1), so
+     the script flourish takes the primary pink (≈5.5:1). */
+  "--lf-rose-ink": "var(--lf-gold)",
   "--lf-muted": "color-mix(in srgb, var(--lf-ink) 72%, var(--lf-ivory))",
 } as CSSProperties
 
