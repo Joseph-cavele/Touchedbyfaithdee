@@ -77,6 +77,9 @@ export function SiteAbout() {
                 controls
                 autoPlay
                 playsInline
+                // Back to the photo and play button once the tour finishes,
+                // rather than leaving a stopped player on its last frame.
+                onEnded={() => setPlaying(false)}
                 aria-label={`Tour of ${SALON_NAME}`}
                 className="h-full w-full object-cover"
               />

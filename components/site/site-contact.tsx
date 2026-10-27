@@ -25,8 +25,6 @@ import {
   SALON_HOURS,
   SALON_MAP_QUERY,
   SALON_PHONE,
-  SALON_PHONE_ALT,
-  SALON_PHONE_ALT_DISPLAY,
   SALON_PHONE_DISPLAY,
   WHATSAPP_MESSAGES,
   whatsappLink,
@@ -486,14 +484,6 @@ export function SiteContact() {
                 >
                   <Phone className="size-4 shrink-0 text-brand-accent-ink" aria-hidden />
                   {PHONE}
-                </a>
-
-                <a
-                  href={`tel:${SALON_PHONE_ALT}`}
-                  className="flex items-center gap-3 font-ui text-sm text-brand-muted transition-colors hover:text-brand-accent-ink"
-                >
-                  <Phone className="size-4 shrink-0 text-brand-accent-ink" aria-hidden />
-                  {SALON_PHONE_ALT_DISPLAY}
                 </a>
 
                 <a

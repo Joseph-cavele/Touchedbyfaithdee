@@ -26,10 +26,6 @@ export const SALON_PHONE = "+27739790375"
 /** Same number, spaced for reading. Never put this in an href. */
 export const SALON_PHONE_DISPLAY = "073 979 0375"
 
-/** The studio's second line — calls only; WhatsApp is on the main number. */
-export const SALON_PHONE_ALT = "+27730700375"
-export const SALON_PHONE_ALT_DISPLAY = "073 070 0375"
-
 /** wa.me wants the number with no "+", spaces or punctuation. */
 export const SALON_WHATSAPP = "27739790375"
 

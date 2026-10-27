@@ -11,7 +11,7 @@ The codebase started as the La-fe Beauty Parlor site and was rebranded. La-fe is
 | | |
 | --- | --- |
 | Owner and only stylist | Kegomoditse Faith Diale |
-| Phone / WhatsApp | 073 979 0375 (second line: 073 070 0375, calls only) |
+| Phone / WhatsApp | 073 979 0375 (the only number shown; the second line, 073 070 0375, was taken off the site on 2026-10-27) |
 | Email | faithdiale4@gmail.com |
 | Address | 2389 Rangaka Street, Tlhabane, 0309 (North West) |
 | Hours | Monday – Sunday, 08:30 – 18:00 (also the booking window) |
