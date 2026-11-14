@@ -58,22 +58,22 @@ async function fetchDashboardData(): Promise<DashboardData> {
   const todayStr = salonToday()
   const realBookings = bookings.filter((booking) => !isSampleBooking(booking))
 
-  /* Revenue in two parts, so a confirmed appointment shows up the moment
-     it's booked instead of reading R0 until the visit is marked Completed:
+  /* Revenue in two parts, so an approved appointment shows up immediately:
        earned = COMPLETED (done and paid)
-       booked = CONFIRMED / PENDING (coming up, paid on the day)
-     Cancelled, no-show and unpaid-online bookings count for neither. */
+       booked = CONFIRMED (approved, coming up, paid on the day)
+     Pending review, rejected, cancelled, no-show and unpaid-online bookings
+     count for neither. */
   const sumAmount = (statuses: string[]) =>
     realBookings
       .filter((b) => statuses.includes(b.status))
       .reduce((sum, b) => sum + (b.amount ?? 0), 0)
   const earnedRevenue = sumAmount(["COMPLETED"])
-  const bookedRevenue = sumAmount(["CONFIRMED", "PENDING"])
+  const bookedRevenue = sumAmount(["CONFIRMED"])
   const totalRevenue = earnedRevenue + bookedRevenue
 
   const totalAppointments = realBookings.length
   const todaysAppointments = realBookings.filter(
-    (b) => b.bookingDate === todayStr && b.status !== "CANCELLED"
+    (b) => b.bookingDate.slice(0, 10) === todayStr && b.status !== "CANCELLED"
   ).length
   // Made today, for any date — so a booking taken today shows up on the
   // card even when the appointment itself is later in the week.
@@ -115,9 +115,13 @@ async function fetchDashboardData(): Promise<DashboardData> {
 
   const upcomingAppointments = realBookings
     .filter((b) => ["PENDING", "CONFIRMED"].includes(b.status) && b.bookingDate >= todayStr)
-    .sort((a, b) =>
-      `${a.bookingDate}${a.bookingTime}`.localeCompare(`${b.bookingDate}${b.bookingTime}`)
-    )
+    .sort((a, b) => {
+      const approvalPriority = Number(a.status !== "PENDING") - Number(b.status !== "PENDING")
+      return (
+        approvalPriority ||
+        `${a.bookingDate}${a.bookingTime}`.localeCompare(`${b.bookingDate}${b.bookingTime}`)
+      )
+    })
     .slice(0, 10)
     .map((b) => ({
       id: String(b._id),
@@ -165,6 +169,6 @@ async function fetchDashboardData(): Promise<DashboardData> {
  */
 export const getDashboardData = unstable_cache(
   fetchDashboardData,
-  ["dashboard-data-v3"],
+  ["dashboard-data-v4"],
   { tags: ["dashboard"], revalidate: 60 }
 )

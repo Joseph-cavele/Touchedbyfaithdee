@@ -12,18 +12,49 @@ import { Textarea } from "@/components/ui/textarea"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
 import { formatCurrency, formatPrice } from "@/lib/currency"
+import { SALON_HOURS } from "@/lib/salon-contact"
 import { useServices } from "@/features/bookings/hooks/use-services"
 import { useStylists } from "@/features/bookings/hooks/use-stylists"
 import { SERVICE_CATEGORIES } from "@/features/services/schema"
 import { walkInSchema } from "@/features/bookings/walk-in-schema"
 
+const WALK_IN_TIME_STEP_MINUTES = 5
+
+function toMinutes(hhmm: string) {
+  const [hours, minutes] = hhmm.split(":").map(Number)
+  return hours * 60 + minutes
+}
+
+function toHHMM(minutes: number) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`
+}
+
+function formatTime(hhmm: string) {
+  const [hours, minutes] = hhmm.split(":").map(Number)
+  const suffix = hours >= 12 ? "PM" : "AM"
+  return `${hours % 12 || 12}:${String(minutes).padStart(2, "0")} ${suffix}`
+}
+
+const WALK_IN_TIME_OPTIONS = (() => {
+  const options: string[] = []
+  const open = toMinutes(SALON_HOURS.open)
+  const close = toMinutes(SALON_HOURS.close)
+  for (let time = open; time <= close; time += WALK_IN_TIME_STEP_MINUTES) {
+    options.push(toHHMM(time))
+  }
+  return options
+})()
+
 /** Today's date and the current time (to 5 minutes), in the browser's zone. */
 function nowParts() {
   const d = new Date()
   const pad = (n: number) => String(n).padStart(2, "0")
+  const open = toMinutes(SALON_HOURS.open)
+  const close = toMinutes(SALON_HOURS.close)
+  const currentTime = d.getHours() * 60 + Math.floor(d.getMinutes() / WALK_IN_TIME_STEP_MINUTES) * WALK_IN_TIME_STEP_MINUTES
   return {
     date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
-    time: `${pad(d.getHours())}:${pad(Math.floor(d.getMinutes() / 5) * 5)}`,
+    time: toHHMM(Math.min(Math.max(currentTime, open), close)),
   }
 }
 
@@ -259,7 +290,18 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
             </Field>
             <Field>
               <FieldLabel htmlFor="walkin-time">Time</FieldLabel>
-              <Input id="walkin-time" type="time" step={300} value={bookingTime} onChange={(e) => setBookingTime(e.target.value)} />
+              <select
+                id="walkin-time"
+                className={cn(selectClass, "cursor-pointer")}
+                value={bookingTime}
+                onChange={(e) => setBookingTime(e.target.value)}
+              >
+                {WALK_IN_TIME_OPTIONS.map((time) => (
+                  <option key={time} value={time}>
+                    {formatTime(time)}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
 

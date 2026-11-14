@@ -20,6 +20,7 @@ const bookingSchema = new Schema(
         "PENDING_PAYMENT",
         "PENDING",
         "CONFIRMED",
+        "REJECTED",
         "CANCELLED",
         "COMPLETED",
         "NO_SHOW",
@@ -53,12 +54,29 @@ const bookingSchema = new Schema(
     paymentReference: { type: String, index: true, sparse: true, unique: true },
     paidAt: { type: Date },
 
+    approvedAt: { type: Date },
+    rejectedAt: { type: Date },
+    rejectionReason: { type: String, trim: true },
+    reviewedBy: { type: String, trim: true },
+
     /* Scheduled emails (features/notifications/server/scheduled-emails.ts).
        Each is set when that email is sent, so it goes out once only. */
     /** "Your appointment is in 2 hours" reminder. */
     reminderSentAt: { type: Date },
     /** "We miss you" follow-up, two weeks after this (completed) visit. */
     followUpSentAt: { type: Date },
+
+    ownerReminderSentAt: { type: Date },
+    ownerReminderClaimedAt: { type: Date },
+    ownerReminderLastError: { type: String },
+    customer24HourReminderSentAt: { type: Date },
+    customer24HourReminderClaimedAt: { type: Date },
+    customer24HourReminderSkippedAt: { type: Date },
+    customer24HourReminderLastError: { type: String },
+    customer2HourReminderSentAt: { type: Date },
+    customer2HourReminderClaimedAt: { type: Date },
+    customer2HourReminderSkippedAt: { type: Date },
+    customer2HourReminderLastError: { type: String },
   },
   { timestamps: true }
 )
@@ -88,6 +106,9 @@ bookingSchema.index({ customer: 1 })
 
 // A stylist's day — slot availability and the stylist schedule view.
 bookingSchema.index({ stylist: 1, bookingDate: 1, bookingTime: 1 })
+
+// Due reminder scans by status and appointment date.
+bookingSchema.index({ status: 1, bookingDate: 1, createdAt: 1 })
 
 export type BookingDoc = InferSchemaType<typeof bookingSchema>
 export const BookingModel = models.Booking || model("Booking", bookingSchema)

@@ -8,6 +8,7 @@ import {
   initializeTransaction,
   isPaystackConfigured,
 } from "@/lib/paystack"
+import { ONLINE_PAYMENTS_ENABLED } from "@/features/bookings/schema"
 import "@/lib/models"
 
 const bodySchema = z.object({
@@ -24,6 +25,13 @@ const bodySchema = z.object({
  * shape here that lets a caller influence the price.
  */
 export async function POST(req: NextRequest) {
+  if (!ONLINE_PAYMENTS_ENABLED) {
+    return NextResponse.json(
+      { error: "Online payment is disabled. Please pay in person after approval." },
+      { status: 503 }
+    )
+  }
+
   if (!isPaystackConfigured) {
     console.error("Payment attempted but PAYSTACK_SECRET_KEY is not set.")
     return NextResponse.json(

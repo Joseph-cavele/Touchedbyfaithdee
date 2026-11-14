@@ -8,13 +8,25 @@ interface PopulatedBooking {
   services: { name: string; price: number }[]
   bookingDate: string
   status: string
+  amount?: number
 }
 
-const STATUSES = ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"] as const
+const STATUSES = [
+  "PENDING_PAYMENT",
+  "PENDING",
+  "CONFIRMED",
+  "REJECTED",
+  "CANCELLED",
+  "COMPLETED",
+  "NO_SHOW",
+] as const
+const REVENUE_STATUSES = new Set(["CONFIRMED", "COMPLETED"])
 
 function bookingTotal(b: PopulatedBooking) {
   // Unpriced ("price on request") services contribute nothing to revenue.
-  return b.services.reduce((sum, s) => sum + (s.price ?? 0), 0)
+  const serviceTotal = b.services.reduce((sum, s) => sum + (s.price ?? 0), 0)
+  // Use the amount captured when booked; fall back for legacy records without one.
+  return b.amount && b.amount > 0 ? b.amount : serviceTotal
 }
 
 function monthLabel(key: string) {
@@ -33,11 +45,12 @@ export async function getReports(): Promise<ReportsData> {
   const totalBookings = bookings.length
   const completed = bookings.filter((b) => b.status === "COMPLETED")
   const cancelled = bookings.filter((b) => b.status === "CANCELLED")
-  // Earned = completed; booked = confirmed/pending, not yet done. The
+  const revenueBookings = bookings.filter((b) => REVENUE_STATUSES.has(b.status))
+  // Earned = completed; booked = confirmed, not yet done. The
   // headline total is both, matching the dashboard's revenue card.
   const earnedRevenue = completed.reduce((sum, b) => sum + bookingTotal(b), 0)
   const bookedRevenue = bookings
-    .filter((b) => b.status === "CONFIRMED" || b.status === "PENDING")
+    .filter((b) => b.status === "CONFIRMED")
     .reduce((sum, b) => sum + bookingTotal(b), 0)
   const totalRevenue = earnedRevenue + bookedRevenue
   const completedCount = completed.length
@@ -46,7 +59,7 @@ export async function getReports(): Promise<ReportsData> {
     ? Math.round((cancelled.length / totalBookings) * 100)
     : 0
 
-  // Monthly revenue for the last 6 months (from completed bookings).
+  // Monthly revenue for the last 6 months (earned and confirmed bookings).
   const now = new Date()
   const monthKeys: string[] = []
   for (let i = 5; i >= 0; i--) {
@@ -54,7 +67,7 @@ export async function getReports(): Promise<ReportsData> {
     monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
   }
   const revenueByMonth = new Map(monthKeys.map((k) => [k, 0]))
-  for (const b of completed) {
+  for (const b of revenueBookings) {
     const key = b.bookingDate.slice(0, 7)
     if (revenueByMonth.has(key)) {
       revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + bookingTotal(b))
@@ -73,7 +86,7 @@ export async function getReports(): Promise<ReportsData> {
   // Top services: booking count (excluding cancelled) + revenue (from completed).
   const serviceMap = new Map<string, { count: number; revenue: number }>()
   for (const b of bookings) {
-    if (b.status === "CANCELLED") continue
+    if (b.status === "CANCELLED" || b.status === "REJECTED") continue
     for (const s of b.services) {
       const entry = serviceMap.get(s.name) ?? { count: 0, revenue: 0 }
       entry.count += 1
@@ -89,7 +102,7 @@ export async function getReports(): Promise<ReportsData> {
   // Top stylists: bookings (excluding cancelled) + revenue (from completed).
   const stylistMap = new Map<string, { bookings: number; revenue: number }>()
   for (const b of bookings) {
-    if (b.status === "CANCELLED") continue
+    if (b.status === "CANCELLED" || b.status === "REJECTED") continue
     const name = b.stylist?.name ?? "Unknown"
     const entry = stylistMap.get(name) ?? { bookings: 0, revenue: 0 }
     entry.bookings += 1

@@ -10,7 +10,7 @@ import { confirmPaidBooking } from "@/features/bookings/server/confirm-paid-book
  * and a customer who closes the tab never hits it at all. So it does exactly
  * what the webhook does: hands the reference to `confirmPaidBooking`, which
  * asks Paystack what really happened. Whichever arrives first settles the
- * booking; the second is a no-op.
+ * payment; the second is a no-op. Payment does not approve the appointment.
  */
 export async function GET(req: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
     const result = await confirmPaidBooking(reference)
 
     switch (result.outcome) {
-      case "confirmed":
-      case "already-confirmed":
+      case "paid":
+      case "already-paid":
         return NextResponse.redirect(
           new URL(`/book/payment/success?booking=${result.bookingId}`, baseUrl)
         )

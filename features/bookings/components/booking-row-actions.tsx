@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { MoreVertical, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { apiErrorMessage } from "@/lib/api-client"
 import { useUpdateBookingStatus } from "@/features/bookings/hooks/use-update-booking-status"
 import type { BookingStatus } from "@/types"
 import {
@@ -23,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 
-type ActionableStatus = "CONFIRMED" | "CANCELLED" | "COMPLETED" | "NO_SHOW"
+type ActionableStatus = "CONFIRMED" | "REJECTED" | "CANCELLED" | "COMPLETED" | "NO_SHOW"
 
 const ACTIONS_BY_STATUS: Record<BookingStatus, { label: string; status: ActionableStatus }[]> = {
   /* Awaiting an online payment. "Confirm" is deliberately offered: a customer
@@ -32,10 +33,12 @@ const ACTIONS_BY_STATUS: Record<BookingStatus, { label: string; status: Actionab
      ever set to PAID by a verified Paystack transaction, never by a click. */
   PENDING_PAYMENT: [
     { label: "Confirm (paid in person)", status: "CONFIRMED" },
+    { label: "Reject", status: "REJECTED" },
     { label: "Cancel", status: "CANCELLED" },
   ],
   PENDING: [
-    { label: "Confirm", status: "CONFIRMED" },
+    { label: "Approve", status: "CONFIRMED" },
+    { label: "Reject", status: "REJECTED" },
     { label: "Cancel", status: "CANCELLED" },
   ],
   CONFIRMED: [
@@ -43,6 +46,7 @@ const ACTIONS_BY_STATUS: Record<BookingStatus, { label: string; status: Actionab
     { label: "Mark no-show", status: "NO_SHOW" },
     { label: "Cancel", status: "CANCELLED" },
   ],
+  REJECTED: [],
   CANCELLED: [],
   COMPLETED: [],
   NO_SHOW: [],
@@ -56,6 +60,7 @@ export function BookingRowActions({
   status: BookingStatus
 }) {
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState("")
   const updateStatus = useUpdateBookingStatus()
 
@@ -70,6 +75,8 @@ export function BookingRowActions({
           toast.success(
             nextStatus === "CONFIRMED"
               ? "Booking confirmed"
+              : nextStatus === "REJECTED"
+                ? "Booking rejected"
               : nextStatus === "CANCELLED"
                 ? "Booking cancelled"
                 : nextStatus === "COMPLETED"
@@ -84,9 +91,10 @@ export function BookingRowActions({
             )
           }
           setCancelOpen(false)
+          setRejectOpen(false)
           setReason("")
         },
-        onError: () => toast.error("Could not update booking. Please try again."),
+        onError: (error) => toast.error(apiErrorMessage(error, "Could not update booking. Please try again.")),
       }
     )
   }
@@ -107,6 +115,8 @@ export function BookingRowActions({
               onClick={() =>
                 action.status === "CANCELLED"
                   ? setCancelOpen(true)
+                  : action.status === "REJECTED"
+                    ? setRejectOpen(true)
                   : applyStatus(action.status)
               }
             >
@@ -145,6 +155,40 @@ export function BookingRowActions({
             >
               {updateStatus.isPending && <Loader2 className="size-4 animate-spin" />}
               Cancel booking
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject booking</DialogTitle>
+            <DialogDescription>
+              The customer will be notified that the request was not approved.
+              You can include an optional reason.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`reject-reason-${bookingId}`}>Reason (optional)</Label>
+            <Textarea
+              id={`reject-reason-${bookingId}`}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Add a short message for the customer"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectOpen(false)}>
+              Keep booking
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={updateStatus.isPending}
+              onClick={() => applyStatus("REJECTED", reason || undefined)}
+            >
+              {updateStatus.isPending && <Loader2 className="size-4 animate-spin" />}
+              Reject booking
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -17,13 +17,18 @@ type BookingWithDurations = {
  * Each booking blocks the sum of its services' durations, so a long service
  * blocks every slot it runs through — not just its start time.
  */
-export async function getBusyIntervals(stylistId: string, bookingDate: string): Promise<BusyInterval[]> {
+export async function getBusyIntervals(
+  stylistId: string,
+  bookingDate: string,
+  excludeBookingId?: string
+): Promise<BusyInterval[]> {
   await connectDB()
 
   const bookings = await BookingModel.find({
     stylist: stylistId,
     bookingDate,
     status: { $in: SLOT_HOLDING_STATUSES },
+    ...(excludeBookingId ? { _id: { $ne: excludeBookingId } } : {}),
   })
     .select("bookingTime services")
     .populate("services", "duration")

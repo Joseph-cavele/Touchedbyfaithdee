@@ -19,18 +19,21 @@ import { AddWalkInButton } from "@/features/bookings/components/walk-in-dialog"
 import type { BookingStatus } from "@/types"
 
 const TABS: { label: string; status?: BookingStatus }[] = [
-  { label: "All" },
-  { label: "Awaiting payment", status: "PENDING_PAYMENT" },
   { label: "Pending", status: "PENDING" },
   { label: "Confirmed", status: "CONFIRMED" },
+  { label: "Rejected", status: "REJECTED" },
   { label: "Cancelled", status: "CANCELLED" },
+  { label: "All" },
+  { label: "Awaiting payment", status: "PENDING_PAYMENT" },
   { label: "Completed", status: "COMPLETED" },
+  { label: "No-show", status: "NO_SHOW" },
 ]
 
 const statusVariant: Record<BookingStatus, "default" | "secondary" | "destructive" | "outline"> = {
   PENDING_PAYMENT: "outline",
   PENDING: "secondary",
   CONFIRMED: "default",
+  REJECTED: "destructive",
   CANCELLED: "destructive",
   COMPLETED: "outline",
   NO_SHOW: "outline",
@@ -46,7 +49,7 @@ function WalkInTag() {
 }
 
 export function BookingsManagement() {
-  const [tab, setTab] = useState<string>("All")
+  const [tab, setTab] = useState<string>("Pending")
   const activeStatus = TABS.find((t) => t.label === tab)?.status
   const { data, isLoading, isError } = useBookings(activeStatus)
 

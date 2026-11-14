@@ -4,8 +4,8 @@ import { timingSafeEqual } from "node:crypto"
 import { sendDueFollowUps, sendDueReminders } from "@/features/notifications/server/scheduled-emails"
 
 /**
- * GET /api/cron/emails — sends what's due: 2-hour appointment reminders and
- * "we miss you" follow-ups (features/notifications/server/scheduled-emails.ts).
+ * GET /api/cron/emails — sends due approval reminders, confirmed appointment
+ * reminders, and "we miss you" follow-ups.
  *
  * Call it every 15 minutes with the header
  *   Authorization: Bearer <CRON_SECRET>
@@ -28,7 +28,10 @@ export async function GET(req: Request) {
   }
 
   const now = new Date()
-  const [reminders, followUps] = await Promise.all([sendDueReminders(now), sendDueFollowUps(now)])
+  const [reminders, followUps] = await Promise.all([
+    sendDueReminders(now),
+    sendDueFollowUps(now),
+  ])
   console.log(`📬 Scheduled emails — reminders: ${JSON.stringify(reminders)}, follow-ups: ${JSON.stringify(followUps)}`)
   return NextResponse.json({ ranAt: now.toISOString(), reminders, followUps })
 }

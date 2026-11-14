@@ -27,8 +27,8 @@ export default function PaymentSuccessPage() {
           </h1>
 
           <p className="mt-3 font-ui text-sm leading-[1.7] text-brand-muted">
-            Your payment was processed and your appointment is confirmed. A
-            confirmation email is on its way with the details.
+            Your payment was received. The salon will review your appointment
+            request and email you when it has been approved.
           </p>
 
           <Link

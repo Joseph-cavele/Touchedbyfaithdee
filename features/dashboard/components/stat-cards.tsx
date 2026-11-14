@@ -46,10 +46,11 @@ export function StatCards({ stats }: { stats: DashboardStats }) {
       tint: "bg-primary/12 text-brand-accent-ink",
     },
     {
-      label: "Pending appointments",
+      label: "Awaiting approval",
       value: stats.pendingAppointments.toLocaleString(),
+      detail: "Needs your decision",
       icon: Hourglass,
-      tint: "bg-muted text-muted-foreground",
+      tint: "bg-primary/12 text-brand-accent-ink",
     },
     {
       label: "Stylists",

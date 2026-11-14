@@ -7,8 +7,10 @@ import type { ReportsData } from "@/types"
    summed and charted in the spreadsheet. */
 
 const STATUS_LABELS: Record<string, string> = {
+  PENDING_PAYMENT: "Awaiting payment",
   PENDING: "Pending",
   CONFIRMED: "Confirmed",
+  REJECTED: "Rejected",
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
   NO_SHOW: "No-show",
@@ -28,7 +30,7 @@ export function reportsToCsv(data: ReportsData, generatedAt: Date) {
   const lines = [
     row(`${SALON_NAME} — Business report`),
     row("Generated", generatedAt.toLocaleString("en-ZA")),
-    row("Total revenue = earned (completed) + booked (confirmed, not yet done). Monthly and per-service revenue count completed bookings. Amounts are in rand (ZAR)."),
+    row("Total revenue = earned (completed) + booked (confirmed, not yet done). Monthly revenue counts both; per-service revenue counts completed bookings. Amounts are in rand (ZAR)."),
     "",
     row("Summary"),
     row("Metric", "Value"),

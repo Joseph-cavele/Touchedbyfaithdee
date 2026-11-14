@@ -7,14 +7,15 @@ import { ServiceModel } from "@/lib/models/Service"
 import { BookingModel } from "@/lib/models/Booking"
 import { BookingImageModel } from "@/lib/models/BookingImage"
 import { NotificationModel } from "@/lib/models/Notification"
-import { createBookingSchema, ONLINE_PAYMENTS_ENABLED } from "@/features/bookings/schema"
+import { createBookingSchema } from "@/features/bookings/schema"
+import { salonDateTime, salonToday } from "@/lib/date"
 import { isSlotTaken, runsPastClosing, TIME_SLOTS, toMinutes } from "@/features/bookings/availability"
 import { getBusyIntervals } from "@/features/bookings/server/get-busy-intervals"
 import { getBookings } from "@/features/bookings/server/get-bookings"
 import { emailFrom, EMAIL_REPLY_TO, resend } from "@/lib/resend"
 import { formatTotal } from "@/lib/currency"
 import { newBookingOwnerEmailHtml } from "@/emails/new-booking-owner"
-import { appointmentConfirmedEmailHtml } from "@/emails/appointment-confirmed"
+import { bookingRequestReceivedEmailHtml } from "@/emails/booking-reminders"
 import type { BookingStatus } from "@/types"
 import { requireOwner } from "@/lib/auth-guard"
 
@@ -64,16 +65,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "One or more services not found" }, { status: 404 })
   }
 
-  /* Online payment is switched off (see ONLINE_PAYMENTS_ENABLED).
-     Refused here too, not just hidden in the wizard, so a hand-made request
-     can't start a Paystack charge. */
-  if (paymentMethod === "ONLINE" && !ONLINE_PAYMENTS_ENABLED) {
-    return NextResponse.json(
-      { error: "Online payment is not available. Please choose pay in person." },
-      { status: 400 }
-    )
-  }
-
   /* Double-booking guard. The new booking runs for the sum of its services'
      durations and must not overlap anything the stylist already holds that
      day. The wizard greys these times out too, but this is the check that
@@ -82,6 +73,12 @@ export async function POST(req: NextRequest) {
   if (!TIME_SLOTS.includes(bookingTime)) {
     return NextResponse.json(
       { error: "Please choose a time within opening hours." },
+      { status: 400 }
+    )
+  }
+  if (bookingDate < salonToday() || salonDateTime(bookingDate, bookingTime) <= new Date()) {
+    return NextResponse.json(
+      { error: "Choose an appointment time in the future." },
       { status: 400 }
     )
   }
@@ -115,7 +112,6 @@ export async function POST(req: NextRequest) {
      book a R1,500 install for R1. */
   const amount = services.reduce((sum, s) => sum + (s.price ?? 0), 0)
 
-  const payingOnline = paymentMethod === "ONLINE"
   const totalDisplay = formatTotal(services.map((s) => s.price))
 
   const booking = await BookingModel.create({
@@ -129,11 +125,7 @@ export async function POST(req: NextRequest) {
     amount,
     paymentMethod,
     paymentStatus: "UNPAID",
-    /* Booking in person confirms the slot immediately — the salon no longer
-       reviews each request by hand. Paying online still holds the slot and
-       confirms nothing until Paystack settles, because there the money, not
-       the salon, is what the booking is waiting on. */
-    status: payingOnline ? "PENDING_PAYMENT" : "CONFIRMED",
+    status: "PENDING",
   })
 
   if (imageUrls.length > 0) {
@@ -142,51 +134,35 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  /* "Booked", not "requested" — the dashboard notification used to be a
-     prompt to go and act on something. Now it is a heads-up about a slot
-     that is already taken. */
-  if (!payingOnline) await NotificationModel.create({
+  /* Hold the selected slot while the owner reviews this request. */
+  await NotificationModel.create({
     title: "New Booking",
-    message: `${customerName} booked an appointment with ${stylist.name}`,
+    message: `${customerName} requested an appointment with ${stylist.name}. Approval is required.`,
     bookingId: booking._id,
     read: false,
   })
 
-  /* The customer's confirmation.
-     Previously this went out when the owner pressed Confirm on the dashboard
-     (see app/api/bookings/[id]/route.ts, which still sends it for a status
-     changed by hand). With the booking confirmed on creation there is no
-     such press, so without this the customer would be told nothing at all —
-     the booking would be confirmed in the database and silent to the person
-     who made it.
-
-     Best-effort, like every other send here: the slot is taken whether or
-     not the mail lands, and failing the request would tell the customer
-     their booking did not happen when it did. */
-  if (!payingOnline && resend && customerEmail) {
+  if (resend && customerEmail) {
     try {
       const { error } = await resend.emails.send({
         from: emailFrom(),
         to: customerEmail,
         replyTo: EMAIL_REPLY_TO,
-        subject: "Touchedbyfaithdee Studio — your appointment is confirmed",
-        html: appointmentConfirmedEmailHtml({
+        subject: "Touchedbyfaithdee Studio — booking request received",
+        html: bookingRequestReceivedEmailHtml({
           customerName,
-          stylistName: stylist.name,
           serviceNames: services.map((s) => s.name),
           bookingDate,
           bookingTime,
-          totalDisplay,
         }),
       })
-      // Resend reports rejections on the result rather than throwing.
-      if (error) console.error("Customer confirmation email rejected by Resend:", error)
+      if (error) console.error("Customer booking receipt rejected by Resend:", error)
     } catch (err) {
-      console.error("Failed to send customer confirmation email", err)
+      console.error("Failed to send customer booking receipt", err)
     }
   }
 
-  if (!payingOnline && resend && process.env.OWNER_EMAIL) {
+  if (resend && process.env.OWNER_EMAIL) {
     try {
       await resend.emails.send({
         from: emailFrom(),

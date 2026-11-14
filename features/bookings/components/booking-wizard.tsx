@@ -12,7 +12,6 @@ import {
   CalendarDays,
   Check,
   Clock,
-  CreditCard,
   Loader2,
   Phone,
   Scissors,
@@ -29,7 +28,6 @@ import { useServices } from "@/features/bookings/hooks/use-services"
 import { useStylists } from "@/features/bookings/hooks/use-stylists"
 import { useCreateBooking } from "@/features/bookings/hooks/use-create-booking"
 import { HairstyleUpload } from "@/features/bookings/components/hairstyle-upload"
-import { startPayment } from "@/features/bookings/start-payment"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -51,8 +49,7 @@ import {
   type BusyInterval,
 } from "@/features/bookings/availability"
 import { useAvailability } from "@/features/bookings/hooks/use-availability"
-import { ONLINE_PAYMENTS_ENABLED } from "@/features/bookings/schema"
-import type { PaymentMethod, Service, Stylist } from "@/types"
+import type { Service, Stylist } from "@/types"
 
 
 const STEPS = [
@@ -60,7 +57,7 @@ const STEPS = [
   { key: "staff", label: "Staff", icon: Users },
   { key: "datetime", label: "Date & Time", icon: CalendarDays },
   { key: "details", label: "Your Details", icon: UserRound },
-  { key: "review", label: "Review & Confirm", icon: BadgeCheck },
+  { key: "review", label: "Review & Submit", icon: BadgeCheck },
 ] as const
 
 const STEP_FIELDS: (keyof CreateBookingFormValues)[][] = [
@@ -144,7 +141,6 @@ export function BookingWizard({
       customerName: "",
       customerEmail: "",
       customerPhone: "",
-      // Overwritten by whichever finish button is pressed.
       paymentMethod: "IN_PERSON",
       serviceIds: initialServiceId ? [initialServiceId] : [],
       stylistId: "",
@@ -215,36 +211,18 @@ export function BookingWizard({
     setStep((s) => Math.max(s - 1, 0))
   }
 
-  /* Which button is mid-flight, so only that one spins. `busy` disables both,
-     because double-submitting creates two bookings for the same slot. */
-  const [pendingMethod, setPendingMethod] = useState<PaymentMethod | null>(null)
-  const busy = createBooking.isPending || pendingMethod !== null
-
-  /** Stamps the chosen method onto the form, then runs the normal submit. */
-  const submitWith = (method: PaymentMethod) => () => {
-    setValue("paymentMethod", method)
-    return handleSubmit(onSubmit, onInvalid)()
-  }
+  const [submitting, setSubmitting] = useState(false)
+  const busy = createBooking.isPending || submitting
 
   async function onSubmit(data: CreateBookingFormValues) {
-    setPendingMethod(data.paymentMethod)
+    setSubmitting(true)
     try {
-      const booking = await createBooking.mutateAsync(data)
-
-      if (data.paymentMethod === "ONLINE") {
-        /* Hands off to Paystack. No success screen here — the booking is not
-           confirmed yet, and saying so before the money moves is the one thing
-           this flow must never do. The callback route decides what the
-           customer sees next. */
-        await startPayment(booking.id)
-        return
-      }
-
-      setPendingMethod(null)
+      await createBooking.mutateAsync(data)
+      setSubmitting(false)
       setSubmitted(true)
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (err) {
-      setPendingMethod(null)
+      setSubmitting(false)
       // Surface the server's actual reason (e.g. "Stylist not found",
       // "Invalid booking data") instead of a generic message, so failures
       // are diagnosable rather than silent.
@@ -257,13 +235,13 @@ export function BookingWizard({
     }
   }
 
-  // Called when the final submit fails client-side validation, so the Confirm
+  // Called when the final submit fails client-side validation, so the Submit
   // button never just does nothing.
   function onInvalid(formErrors: typeof errors) {
     const firstMessage = Object.values(formErrors).find((e) => e?.message)?.message
     toast.error(
       (firstMessage as string) ||
-        "Please complete all required fields before confirming."
+        "Please complete all required fields before submitting."
     )
   }
 
@@ -273,16 +251,12 @@ export function BookingWizard({
         <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-brand-accent/15 text-brand-accent-ink">
           <Check className="size-7" />
         </span>
-        {/* Only the in-person path reaches this screen — the online one hands
-            off to Paystack before it. In-person bookings confirm on creation,
-            so this no longer promises a confirmation that is still coming;
-            it reports one that has already happened. */}
         <h2 className="mt-5 font-display text-2xl font-semibold text-brand-text">
-          Your appointment is confirmed!
+          Your request has been submitted
         </h2>
         <p className="mt-2 text-sm text-brand-muted">
-          The slot is yours — a confirmation email is on its way. Payment is
-          due at the salon.
+          Your appointment is waiting for the salon to review it. We&apos;ll email
+          you when a decision has been made.
         </p>
         <button
           type="button"
@@ -463,43 +437,20 @@ export function BookingWizard({
               <ArrowRight className="size-4" />
             </button>
           ) : (
-            /* Two ways to finish, and the choice is the submit. Both create
-               the same booking; only `paymentMethod` differs, which is what
-               decides whether the server holds it at PENDING_PAYMENT and
-               sends the customer to Paystack. */
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex flex-col items-end gap-2">
               <button
                 type="button"
                 disabled={busy}
-                onClick={submitWith("IN_PERSON")}
-                className={cn(
-                  "inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-semibold transition-colors disabled:opacity-60",
-                  ONLINE_PAYMENTS_ENABLED
-                    ? "border border-brand-line text-brand-text hover:border-brand-accent hover:text-brand-accent-ink"
-                    : "bg-brand-accent text-brand-on-accent hover:bg-brand-accent-hover"
-                )}
+                onClick={() => handleSubmit(onSubmit, onInvalid)()}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-on-accent transition-colors hover:bg-brand-accent-hover disabled:opacity-60"
               >
-                {pendingMethod === "IN_PERSON" && (
-                  <Loader2 className="size-4 animate-spin" />
-                )}
-                {ONLINE_PAYMENTS_ENABLED ? "Pay in person" : "Confirm booking"}
+                {busy && <Loader2 className="size-4 animate-spin" />}
+                Request appointment
               </button>
-
-              {ONLINE_PAYMENTS_ENABLED && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={submitWith("ONLINE")}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-accent px-6 text-sm font-semibold text-brand-on-accent shadow-[0_4px_20px_-5px_color-mix(in_srgb,var(--lz-gold)_35%,transparent)] transition-colors hover:bg-brand-accent-hover disabled:opacity-60"
-              >
-                {pendingMethod === "ONLINE" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <CreditCard className="size-4" aria-hidden />
-                )}
-                {pendingMethod === "ONLINE" ? "Redirecting…" : "Pay now"}
-              </button>
-              )}
+              <p className="text-right text-xs text-brand-muted">
+                Payment is in person. The salon must approve this request before
+                your appointment is confirmed.
+              </p>
             </div>
           )}
         </div>

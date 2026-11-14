@@ -4,7 +4,6 @@ import { X } from "lucide-react"
 
 import { SiteFooter } from "@/components/site/site-footer"
 import { SiteHeader } from "@/components/site/site-header"
-import { RetryPaymentButton } from "@/features/bookings/components/retry-payment-button"
 
 export const metadata: Metadata = {
   title: "Payment unsuccessful | Touchedbyfaithdee Studio",
@@ -12,10 +11,8 @@ export const metadata: Metadata = {
 }
 
 /**
- * The booking is NOT cancelled when payment fails — it is still sitting at
- * PENDING_PAYMENT with the slot held, which is what makes "Try again" mean
- * something. The copy below says so, because the thing a customer whose card
- * just declined most wants to know is whether they lost the appointment.
+ * Kept for older payment links. New bookings use in-person payment and wait
+ * for owner approval.
  */
 export default async function PaymentFailedPage(
   props: PageProps<"/book/payment/failed">
@@ -40,12 +37,12 @@ export default async function PaymentFailedPage(
           <p className="mt-3 font-ui text-sm leading-[1.7] text-brand-muted">
             Nothing was charged, and{" "}
             <strong className="font-semibold text-brand-text">
-              your appointment slot is still held
+              your request is still waiting for salon review
             </strong>
-            . You can try the payment again, or pay in person when you arrive.
+            . New bookings use in-person payment after approval.
           </p>
 
-          {bookingId && <RetryPaymentButton bookingId={bookingId} />}
+          {bookingId && <p className="mt-4 text-xs text-brand-muted">Booking reference: {bookingId}</p>}
 
           <Link
             href="/book"

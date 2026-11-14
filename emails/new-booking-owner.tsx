@@ -9,15 +9,7 @@ interface NewBookingOwnerEmailProps {
   serviceNames: string[]
   bookingDate: string
   bookingTime: string
-  /**
-   * Set for bookings that arrived already paid through Paystack. Adds the
-   * amount row and switches the copy.
-   *
-   * Both variants describe a confirmed booking — bookings confirm on
-   * creation now, so neither asks the owner to review anything. The only
-   * difference is whether the money has already cleared or is due in the
-   * chair.
-   */
+  /** Set for bookings that arrived already paid through Paystack. */
   paidAmount?: number
   /** Total as shown to the customer, e.g. "R 270" or "Price on request". */
   totalDisplay?: string
@@ -38,11 +30,11 @@ export function newBookingOwnerEmailHtml({
   const row = emailRow
 
   return brandedEmail(`
-      <h2 style="margin-top: 0;">${isPaid ? "New Booking — Paid Online" : "New Booking — Confirmed"}</h2>
+      <h2 style="margin-top: 0;">${isPaid ? "New Booking — Paid Online" : "New Booking — Awaiting Approval"}</h2>
       <p>${
         isPaid
-          ? "A new appointment has been paid for online and is already confirmed."
-          : "A new appointment has been booked and confirmed automatically."
+          ? "A new appointment request has been paid for online and is waiting for your review."
+          : "A new appointment request is waiting for your review."
       }</p>
       <table style="width: 100%; border-collapse: collapse;">
         ${row("Customer", `${escapeHtml(customerName)} (${escapeHtml(customerEmail)})`)}
@@ -55,8 +47,8 @@ export function newBookingOwnerEmailHtml({
       </table>
       <p>${
         isPaid
-          ? "The slot is confirmed and the money has cleared. Log in to the dashboard to view it."
-          : "The slot is confirmed and payment is due in person. Log in to the dashboard to view or cancel it."
+          ? "Review the request in the dashboard before confirming the appointment."
+          : "Review the request in the dashboard and approve or reject it."
       }</p>
   `)
 }

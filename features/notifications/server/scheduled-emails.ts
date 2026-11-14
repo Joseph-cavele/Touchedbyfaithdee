@@ -1,32 +1,40 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
 import { connectDB } from "@/lib/db"
-import { salonDateDaysAgo, salonDateTime } from "@/lib/date"
+import { salonDateDaysAgo } from "@/lib/date"
 import { BookingModel } from "@/lib/models/Booking"
 import { CustomerModel } from "@/lib/models/Customer"
 import { emailFrom, EMAIL_REPLY_TO, resend } from "@/lib/resend"
 import { SALON_NAME } from "@/lib/salon-contact"
-import { appointmentReminderEmailHtml } from "@/emails/appointment-reminder"
+import {
+  customerAppointmentReminderEmailHtml,
+  pendingBookingOwnerReminderEmailHtml,
+} from "@/emails/booking-reminders"
 import { weMissYouEmailHtml } from "@/emails/we-miss-you"
+import {
+  getCustomerReminderDecision,
+  OWNER_APPROVAL_REMINDER_DELAY_MS,
+  type CustomerReminderLead,
+} from "@/features/notifications/lib/reminder-schedule"
 
 /* ══════════════════════════════════════════════════════════════════════
    Scheduled customer emails, run by GET /api/cron/emails every 15 minutes.
 
-   Reminder   ~2 hours before a CONFIRMED / PENDING appointment.
-              Skipped when the booking itself was made less than 2 hours
-              before (the confirmation email has only just gone out).
+   Owner      3 hours after a booking is created, while it is still PENDING.
+   Customer   24 hours and 2 hours before a CONFIRMED appointment.
+              A reminder whose due time passed before confirmation is skipped.
    Follow-up  "We miss you", 14 days after a COMPLETED visit, only if the
               client hasn't booked again since, hasn't unsubscribed, and
               hasn't had one in the last 30 days. Visits more than 21 days
               old are left alone, so switching this on doesn't email every
               past client at once.
 
-   Every send is "claimed" first by stamping the booking atomically, so two
-   overlapping runs can't email the same person twice; a failed send
-   un-claims it to be retried on the next run.
+   Each booking is claimed atomically before a send. Resend idempotency keys
+   make retries safe if the worker restarts after delivery but before MongoDB
+   records the sent timestamp. Failed sends are released for the next run.
    ══════════════════════════════════════════════════════════════════════ */
 
-const REMINDER_LEAD_MS = 2 * 60 * 60 * 1000
+const CLAIM_LEASE_MS = 20 * 60 * 1000
 const FOLLOW_UP_AFTER_DAYS = 14
 const FOLLOW_UP_WINDOW_DAYS = 21
 const FOLLOW_UP_GAP_MS = 30 * 24 * 60 * 60 * 1000
@@ -55,7 +63,12 @@ export function isValidUnsubscribeToken(customerId: string, token: string) {
 
 /* ── Sending ────────────────────────────────────────────────────────── */
 
-async function send(to: string, subject: string, html: string): Promise<boolean> {
+async function send(
+  to: string,
+  subject: string,
+  html: string,
+  idempotencyKey?: string
+): Promise<boolean> {
   if (!resend) {
     // No RESEND_API_KEY: log in development so the job can be tried locally.
     if (process.env.NODE_ENV !== "production") {
@@ -66,7 +79,10 @@ async function send(to: string, subject: string, html: string): Promise<boolean>
     return false
   }
   try {
-    const { error } = await resend.emails.send({ from: emailFrom(), to, replyTo: EMAIL_REPLY_TO, subject, html })
+    const message = { from: emailFrom(), to, replyTo: EMAIL_REPLY_TO, subject, html }
+    const { error } = idempotencyKey
+      ? await resend.emails.send(message, { idempotencyKey })
+      : await resend.emails.send(message)
     if (error) {
       console.error("Scheduled email rejected by Resend:", error)
       return false
@@ -86,56 +102,236 @@ type PopulatedBooking = {
   bookingDate: string
   bookingTime: string
   createdAt: Date
+  approvedAt?: Date
+  reminderSentAt?: Date
+  customer24HourReminderSentAt?: Date
+  customer24HourReminderSkippedAt?: Date
+  customer2HourReminderSentAt?: Date
+  customer2HourReminderSkippedAt?: Date
 }
 
 /* ── Reminders ──────────────────────────────────────────────────────── */
 
 export async function sendDueReminders(now = new Date()) {
   await connectDB()
-  const result = { sent: 0, failed: 0 }
+  const result = {
+    ownerSent: 0,
+    customer24HourSent: 0,
+    customer2HourSent: 0,
+    failed: 0,
+    skipped: 0,
+  }
+  const expiredClaim = new Date(now.getTime() - CLAIM_LEASE_MS)
+  const claimable = (field: string) => ({
+    $or: [{ [field]: { $exists: false } }, { [field]: { $lt: expiredClaim } }],
+  })
 
-  // Appointments today or tomorrow (salon dates) that haven't been reminded.
-  const candidates = await BookingModel.find({
-    status: { $in: ["CONFIRMED", "PENDING"] },
-    reminderSentAt: { $exists: false },
-    bookingDate: { $gte: salonDateDaysAgo(0), $lte: salonDateDaysAgo(-1) },
+  const pendingBookings = await BookingModel.find({
+    status: "PENDING",
+    createdAt: { $lte: new Date(now.getTime() - OWNER_APPROVAL_REMINDER_DELAY_MS) },
+    ownerReminderSentAt: { $exists: false },
+    ...claimable("ownerReminderClaimedAt"),
   })
     .populate("customer", "name email")
-    .populate("stylist", "name")
     .populate("services", "name")
     .lean<PopulatedBooking[]>()
 
-  for (const b of candidates) {
-    const email = b.customer?.email
-    if (!email) continue
-    const start = salonDateTime(b.bookingDate, b.bookingTime).getTime()
-    const untilStart = start - now.getTime()
-    if (untilStart <= 0 || untilStart > REMINDER_LEAD_MS) continue
-    // Booked at short notice — the confirmation has only just been sent.
-    if (start - new Date(b.createdAt).getTime() < REMINDER_LEAD_MS) continue
+  for (const booking of pendingBookings) {
+    const ownerEmail = process.env.OWNER_EMAIL?.trim()
+    if (!ownerEmail) {
+      console.error(`Pending-booking reminder failed for ${booking._id}: OWNER_EMAIL is not set`)
+      await BookingModel.updateOne(
+        { _id: booking._id, status: "PENDING", ownerReminderSentAt: { $exists: false } },
+        { $set: { ownerReminderLastError: "OWNER_EMAIL is not set" } }
+      )
+      result.failed++
+      continue
+    }
 
-    const claimed = await BookingModel.updateOne(
-      { _id: b._id, reminderSentAt: { $exists: false } },
-      { $set: { reminderSentAt: now } }
+    const claim = await BookingModel.updateOne(
+      {
+        _id: booking._id,
+        status: "PENDING",
+        ownerReminderSentAt: { $exists: false },
+        ...claimable("ownerReminderClaimedAt"),
+      },
+      { $set: { ownerReminderClaimedAt: now } }
     )
-    if (claimed.modifiedCount === 0) continue // another run took it
+    if (!claim.modifiedCount) continue
+
+    const stillPending = await BookingModel.exists({ _id: booking._id, status: "PENDING" })
+    if (!stillPending) {
+      await BookingModel.updateOne({ _id: booking._id }, { $unset: { ownerReminderClaimedAt: 1 } })
+      continue
+    }
 
     const ok = await send(
-      email,
-      `Reminder: your ${SALON_NAME} appointment is at ${b.bookingTime} today`,
-      appointmentReminderEmailHtml({
-        customerName: b.customer?.name ?? "there",
-        bookingTime: b.bookingTime,
-        serviceNames: b.services.map((s) => s.name),
-        stylistName: b.stylist?.name ?? "our team",
-      })
+      ownerEmail,
+      "Pending Booking Reminder",
+      pendingBookingOwnerReminderEmailHtml({
+        customerName: booking.customer?.name ?? "Unknown",
+        serviceNames: booking.services.map((service) => service.name),
+        bookingDate: booking.bookingDate,
+        bookingTime: booking.bookingTime,
+        dashboardUrl: `${appBaseUrl()}/dashboard/bookings`,
+      }),
+      `booking-${booking._id}-owner-pending`
     )
-    if (ok) result.sent++
-    else {
+
+    if (ok) {
+      await BookingModel.updateOne(
+        { _id: booking._id, ownerReminderClaimedAt: now },
+        {
+          $set: { ownerReminderSentAt: now },
+          $unset: { ownerReminderClaimedAt: 1, ownerReminderLastError: 1 },
+        }
+      )
+      console.info(`Pending-booking reminder sent for ${booking._id} to ${ownerEmail}`)
+      result.ownerSent++
+    } else {
+      await BookingModel.updateOne(
+        { _id: booking._id },
+        {
+          $set: { ownerReminderLastError: "Email delivery failed; retry scheduled." },
+          $unset: { ownerReminderClaimedAt: 1 },
+        }
+      )
+      console.error(`Pending-booking reminder delivery failed for ${booking._id}`)
       result.failed++
-      await BookingModel.updateOne({ _id: b._id }, { $unset: { reminderSentAt: 1 } })
     }
   }
+
+  const confirmedBookings = await BookingModel.find({
+    status: "CONFIRMED",
+    bookingDate: { $gte: salonDateDaysAgo(0), $lte: salonDateDaysAgo(-1) },
+    $or: [
+      { customer24HourReminderSentAt: { $exists: false } },
+      { customer2HourReminderSentAt: { $exists: false } },
+    ],
+  })
+    .populate("customer", "name email")
+    .populate("services", "name")
+    .lean<PopulatedBooking[]>()
+
+  for (const booking of confirmedBookings) {
+    const email = booking.customer?.email?.trim()
+    const details = {
+      customerName: booking.customer?.name ?? "there",
+      serviceNames: booking.services.map((service) => service.name),
+      bookingDate: booking.bookingDate,
+      bookingTime: booking.bookingTime,
+    }
+
+    for (const lead of ["24-hour", "2-hour"] as const satisfies readonly CustomerReminderLead[]) {
+      const sentField = lead === "24-hour"
+        ? "customer24HourReminderSentAt"
+        : "customer2HourReminderSentAt"
+      const claimField = lead === "24-hour"
+        ? "customer24HourReminderClaimedAt"
+        : "customer2HourReminderClaimedAt"
+      const skippedField = lead === "24-hour"
+        ? "customer24HourReminderSkippedAt"
+        : "customer2HourReminderSkippedAt"
+      const lastErrorField = lead === "24-hour"
+        ? "customer24HourReminderLastError"
+        : "customer2HourReminderLastError"
+      const sentAt = lead === "24-hour"
+        ? booking.customer24HourReminderSentAt
+        : booking.customer2HourReminderSentAt
+      const skippedAt = lead === "24-hour"
+        ? booking.customer24HourReminderSkippedAt
+        : booking.customer2HourReminderSkippedAt
+
+      if (sentAt || skippedAt) continue
+      if (lead === "2-hour" && booking.reminderSentAt) {
+        await BookingModel.updateOne(
+          { _id: booking._id, customer2HourReminderSentAt: { $exists: false } },
+          { $set: { customer2HourReminderSentAt: booking.reminderSentAt } }
+        )
+        continue
+      }
+
+      const decision = getCustomerReminderDecision({
+        bookingDate: booking.bookingDate,
+        bookingTime: booking.bookingTime,
+        approvedAt: booking.approvedAt,
+        createdAt: new Date(booking.createdAt),
+        now,
+        lead,
+      })
+      if (decision === "not-due") continue
+      if (decision === "skip" || !email) {
+        await BookingModel.updateOne(
+          { _id: booking._id, status: "CONFIRMED", [sentField]: { $exists: false } },
+          { $set: { [skippedField]: now }, $unset: { [lastErrorField]: 1 } }
+        )
+        console.info(
+          `Customer ${lead} reminder skipped for ${booking._id}${email ? "" : ": no customer email"}`
+        )
+        result.skipped++
+        continue
+      }
+
+      const claim = await BookingModel.updateOne(
+        {
+          _id: booking._id,
+          status: "CONFIRMED",
+          bookingDate: booking.bookingDate,
+          bookingTime: booking.bookingTime,
+          [sentField]: { $exists: false },
+          ...claimable(claimField),
+        },
+        { $set: { [claimField]: now } }
+      )
+      if (!claim.modifiedCount) continue
+
+      const unchanged = await BookingModel.exists({
+        _id: booking._id,
+        status: "CONFIRMED",
+        bookingDate: booking.bookingDate,
+        bookingTime: booking.bookingTime,
+      })
+      if (!unchanged) {
+        await BookingModel.updateOne({ _id: booking._id }, { $unset: { [claimField]: 1 } })
+        continue
+      }
+
+      const ok = await send(
+        email,
+        "Appointment Reminder – Your Salon Visit",
+        customerAppointmentReminderEmailHtml(details),
+        `booking-${booking._id}-customer-${lead}-${booking.bookingDate}-${booking.bookingTime}`
+      )
+      if (ok) {
+        await BookingModel.updateOne(
+          { _id: booking._id, [claimField]: now },
+          {
+            $set: { [sentField]: now },
+            $unset: {
+              [claimField]: 1,
+              [lastErrorField]: 1,
+            },
+          }
+        )
+        console.info(`Customer ${lead} reminder sent for ${booking._id} to ${email}`)
+        if (lead === "24-hour") result.customer24HourSent++
+        else result.customer2HourSent++
+      } else {
+        await BookingModel.updateOne(
+          { _id: booking._id },
+          {
+            $set: {
+              [lastErrorField]: "Email delivery failed; retry scheduled.",
+            },
+            $unset: { [claimField]: 1 },
+          }
+        )
+        console.error(`Customer ${lead} reminder delivery failed for ${booking._id}`)
+        result.failed++
+      }
+    }
+  }
+
   return result
 }
 

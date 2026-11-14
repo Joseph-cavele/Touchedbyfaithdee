@@ -1,6 +1,6 @@
 import { revalidateTag } from "next/cache"
 
-import { appointmentConfirmedEmailHtml } from "@/emails/appointment-confirmed"
+import { bookingRequestReceivedEmailHtml } from "@/emails/booking-reminders"
 import { newBookingOwnerEmailHtml } from "@/emails/new-booking-owner"
 import { connectDB } from "@/lib/db"
 import { BookingModel } from "@/lib/models/Booking"
@@ -10,21 +10,18 @@ import { verifyTransaction } from "@/lib/paystack"
 import "@/lib/models"
 
 export type ConfirmOutcome =
-  | { outcome: "confirmed"; bookingId: string }
-  | { outcome: "already-confirmed"; bookingId: string }
+  | { outcome: "paid"; bookingId: string }
+  | { outcome: "already-paid"; bookingId: string }
   | { outcome: "failed"; bookingId: string; reason: string }
   | { outcome: "unknown-reference"; reason: string }
 
 /**
- * Turns a Paystack reference into a settled booking.
+ * Turns a Paystack reference into a recorded payment. Owner approval is still
+ * required before the booking becomes CONFIRMED.
  *
  * Both the browser callback and the webhook call this, and either can arrive
- * first — or twice, since Paystack retries webhooks. So it has to be
- * idempotent, and the idempotency is enforced by a conditional update rather
- * than a read-then-write: two concurrent calls would both pass an `if
- * (booking.paymentStatus !== "PAID")` check and both send an email. The
- * `findOneAndUpdate` below only matches a booking that is NOT already paid, so
- * exactly one caller gets a document back and sends the confirmation.
+ * first — or twice, since Paystack retries webhooks. The conditional update
+ * ensures only one caller records the payment and sends the notifications.
  */
 export async function confirmPaidBooking(reference: string): Promise<ConfirmOutcome> {
   await connectDB()
@@ -38,8 +35,8 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
   const verified = await verifyTransaction(reference)
 
   if (verified.status !== "success") {
-    /* Left as PENDING_PAYMENT, not cancelled — the customer can retry against
-       the same booking, which is why the slot is still theirs. */
+    /* A failed charge does not reject the request; it remains pending for
+       owner review. */
     await BookingModel.updateOne(
       { _id: existing._id, paymentStatus: { $ne: "PAID" } },
       { $set: { paymentStatus: "FAILED" } }
@@ -49,8 +46,7 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
 
   /* Paystack says paid — but paid HOW MUCH, and in what. A transaction can be
      initialised for one amount and completed for another, so the charge is
-     checked against the amount snapshotted on the booking before anything is
-     confirmed. Underpayment is a failed payment, not a discount. */
+     checked against the amount snapshotted on the booking before recording it. */
   if (verified.currency !== "ZAR" || verified.amount < existing.amount) {
     console.error(
       `Payment mismatch on ${reference}: charged ${verified.amount} ${verified.currency}, expected ${existing.amount} ZAR`
@@ -68,7 +64,6 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
     {
       $set: {
         paymentStatus: "PAID",
-        status: "CONFIRMED",
         paidAt: verified.paidAt ? new Date(verified.paidAt) : new Date(),
       },
     },
@@ -79,7 +74,7 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
     .populate("services")
 
   if (!booking) {
-    return { outcome: "already-confirmed", bookingId }
+    return { outcome: "already-paid", bookingId }
   }
 
   await NotificationModel.create({
@@ -95,21 +90,20 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
         from: emailFrom(),
         to: booking.customer.email,
         replyTo: EMAIL_REPLY_TO,
-        subject: "Touchedbyfaithdee Studio — your appointment is confirmed",
-        html: appointmentConfirmedEmailHtml({
+        subject: "Touchedbyfaithdee Studio — payment received, request awaiting review",
+        html: bookingRequestReceivedEmailHtml({
           customerName: booking.customer.name,
-          stylistName: booking.stylist?.name ?? "your stylist",
           serviceNames: (booking.services ?? []).map((s: { name: string }) => s.name),
           bookingDate: booking.bookingDate,
           bookingTime: booking.bookingTime,
+          paymentReceived: true,
         }),
       })
       // Resend reports rejections on the result rather than throwing.
       if (error) console.error("Confirmation email rejected by Resend:", error)
     } catch (err) {
-      /* Swallowed on purpose: the money is taken and the booking is confirmed.
-         Failing this request over an undelivered email would leave the customer
-         staring at an error page for a payment that actually went through. */
+      /* Swallowed on purpose: the money is taken and the request remains
+         pending owner review. An email failure must not undo the payment. */
       console.error("Failed to send confirmation email", err)
     }
   }
@@ -150,5 +144,5 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
 
   revalidateTag("dashboard", { expire: 0 })
 
-  return { outcome: "confirmed", bookingId }
+  return { outcome: "paid", bookingId }
 }

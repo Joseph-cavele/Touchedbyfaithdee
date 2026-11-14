@@ -4,6 +4,7 @@ export type BookingStatus =
   | "PENDING_PAYMENT"
   | "PENDING"
   | "CONFIRMED"
+  | "REJECTED"
   | "CANCELLED"
   | "COMPLETED"
   | "NO_SHOW"
@@ -89,7 +90,7 @@ export interface DashboardStats {
   totalRevenue: number
   /** From COMPLETED appointments — money already taken. */
   earnedRevenue: number
-  /** From CONFIRMED / PENDING appointments — booked, not yet done. */
+  /** From CONFIRMED appointments — approved, not yet done. */
   bookedRevenue: number
   totalAppointments: number
   /** Appointments dated today (not cancelled). */
@@ -149,6 +150,15 @@ export interface BookingListItem {
   status: BookingStatus
   /** Recorded on the dashboard for a walk-in client. */
   walkIn: boolean
+  rejectionReason?: string
+  ownerReminderSentAt?: string
+  ownerReminderLastError?: string
+  customer24HourReminderSentAt?: string
+  customer24HourReminderSkippedAt?: string
+  customer24HourReminderLastError?: string
+  customer2HourReminderSentAt?: string
+  customer2HourReminderSkippedAt?: string
+  customer2HourReminderLastError?: string
 }
 
 export interface CustomerWithStats {

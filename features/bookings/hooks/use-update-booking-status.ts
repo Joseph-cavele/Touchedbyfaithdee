@@ -17,6 +17,7 @@ export function useUpdateBookingStatus() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       queryClient.invalidateQueries({ queryKey: ["notifications"] })
       queryClient.invalidateQueries({ queryKey: ["bookings"] })
+      queryClient.invalidateQueries({ queryKey: ["reports"] })
     },
   })
 }
