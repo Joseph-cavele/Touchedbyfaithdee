@@ -17,6 +17,7 @@ import { useServices } from "@/features/bookings/hooks/use-services"
 import { useStylists } from "@/features/bookings/hooks/use-stylists"
 import { SERVICE_CATEGORIES } from "@/features/services/schema"
 import { walkInSchema } from "@/features/bookings/walk-in-schema"
+import type { CustomerWithStats } from "@/types"
 
 const WALK_IN_TIME_STEP_MINUTES = 5
 
@@ -136,14 +137,29 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsed.data),
       })
-      const data = (await res.json().catch(() => ({}))) as { message?: string; customerName?: string }
+      const data = (await res.json().catch(() => ({}))) as {
+        message?: string
+        customerId?: string
+        customerName?: string
+      }
       if (!res.ok) {
         setError(data.message ?? "We couldn't save the walk-in. Please try again.")
         return
       }
-      for (const key of ["bookings", "customers", "dashboard", "reports"]) {
-        queryClient.invalidateQueries({ queryKey: [key] })
+      if (data.customerId) {
+        queryClient.setQueryData<CustomerWithStats[]>(["customers"], (customers) =>
+          customers?.map((customer) =>
+            customer.id === data.customerId
+              ? { ...customer, totalBookings: customer.totalBookings + 1 }
+              : customer
+          )
+        )
       }
+      await Promise.all(
+        ["bookings", "customers", "dashboard", "reports"].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] })
+        )
+      )
       toast.success(`Walk-in saved for ${data.customerName ?? parsed.data.name}`)
       onClose()
     } catch {
