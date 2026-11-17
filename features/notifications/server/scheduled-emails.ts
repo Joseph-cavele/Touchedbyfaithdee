@@ -16,6 +16,7 @@ import {
   OWNER_APPROVAL_REMINDER_DELAY_MS,
   type CustomerReminderLead,
 } from "@/features/notifications/lib/reminder-schedule"
+import { getBookingServiceSnapshots } from "@/features/bookings/server/service-snapshots"
 
 /* ══════════════════════════════════════════════════════════════════════
    Scheduled customer emails, run by GET /api/cron/emails every 15 minutes.
@@ -99,6 +100,12 @@ type PopulatedBooking = {
   customer: { _id: unknown; name: string; email?: string; marketingOptOut?: boolean } | null
   stylist: { name: string } | null
   services: { name: string }[]
+  serviceItems?: {
+    serviceId?: unknown
+    serviceName: string
+    price?: number | null
+    duration: number
+  }[]
   bookingDate: string
   bookingTime: string
   createdAt: Date
@@ -170,7 +177,7 @@ export async function sendDueReminders(now = new Date()) {
       "Pending Booking Reminder",
       pendingBookingOwnerReminderEmailHtml({
         customerName: booking.customer?.name ?? "Unknown",
-        serviceNames: booking.services.map((service) => service.name),
+        serviceNames: getBookingServiceSnapshots(booking).map((service) => service.serviceName),
         bookingDate: booking.bookingDate,
         bookingTime: booking.bookingTime,
         dashboardUrl: `${appBaseUrl()}/dashboard/bookings`,
@@ -217,7 +224,7 @@ export async function sendDueReminders(now = new Date()) {
     const email = booking.customer?.email?.trim()
     const details = {
       customerName: booking.customer?.name ?? "there",
-      serviceNames: booking.services.map((service) => service.name),
+      serviceNames: getBookingServiceSnapshots(booking).map((service) => service.serviceName),
       bookingDate: booking.bookingDate,
       bookingTime: booking.bookingTime,
     }
@@ -400,7 +407,7 @@ export async function sendDueFollowUps(now = new Date()) {
       `We miss you at ${SALON_NAME}!`,
       weMissYouEmailHtml({
         customerName: customer.name,
-        serviceNames: visit.services.map((s) => s.name),
+        serviceNames: getBookingServiceSnapshots(visit).map((s) => s.serviceName),
         bookUrl: `${appBaseUrl()}/book`,
         unsubscribeUrl: unsubscribeUrl(customerId),
       })

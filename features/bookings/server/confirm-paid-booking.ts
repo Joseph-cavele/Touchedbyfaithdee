@@ -1,4 +1,5 @@
 import { revalidateTag } from "next/cache"
+import { getBookingServiceSnapshots } from "@/features/bookings/server/service-snapshots"
 
 import { bookingRequestReceivedEmailHtml } from "@/emails/booking-reminders"
 import { newBookingOwnerEmailHtml } from "@/emails/new-booking-owner"
@@ -85,6 +86,7 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
   })
 
   if (resend && booking.customer?.email) {
+    const serviceNames = getBookingServiceSnapshots(booking).map((service) => service.serviceName)
     try {
       const { error } = await resend.emails.send({
         from: emailFrom(),
@@ -93,7 +95,7 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
         subject: "Touchedbyfaithdee Studio — payment received, request awaiting review",
         html: bookingRequestReceivedEmailHtml({
           customerName: booking.customer.name,
-          serviceNames: (booking.services ?? []).map((s: { name: string }) => s.name),
+          serviceNames,
           bookingDate: booking.bookingDate,
           bookingTime: booking.bookingTime,
           paymentReceived: true,
@@ -121,6 +123,7 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
      cost the owner their copy, and vice versa. Both are best-effort for the
      same reason: the payment is already taken. */
   if (resend && process.env.OWNER_EMAIL) {
+    const serviceNames = getBookingServiceSnapshots(booking).map((service) => service.serviceName)
     try {
       const { error } = await resend.emails.send({
         from: emailFrom(),
@@ -130,7 +133,7 @@ export async function confirmPaidBooking(reference: string): Promise<ConfirmOutc
           customerName: booking.customer?.name ?? "A customer",
           customerEmail: booking.customer?.email ?? "",
           stylistName: booking.stylist?.name ?? "Unassigned",
-          serviceNames: (booking.services ?? []).map((s: { name: string }) => s.name),
+          serviceNames,
           bookingDate: booking.bookingDate,
           bookingTime: booking.bookingTime,
           paidAmount: existing.amount,

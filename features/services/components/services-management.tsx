@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Loader2, Pencil, Plus, Power } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,19 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
 import { useServices } from "@/features/bookings/hooks/use-services"
-import { useDeleteService } from "@/features/services/hooks/use-delete-service"
+import { useToggleService } from "@/features/services/hooks/use-toggle-service"
 import { ServiceFormDialog } from "@/features/services/components/service-form-dialog"
-import { COMBO_CATEGORY, type SERVICE_CATEGORIES } from "@/features/services/schema"
+import { COMBO_CATEGORY, SERVICE_CATEGORIES } from "@/features/services/schema"
 import { formatPrice } from "@/lib/currency"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import type { Service } from "@/types"
 
 function formatDuration(minutes: number) {
@@ -46,15 +40,29 @@ export function ServicesManagement({
 }: {
   category?: (typeof SERVICE_CATEGORIES)[number]
 } = {}) {
-  const { data: all, isLoading, isError } = useServices()
-  const data = category ? all?.filter((s) => s.category === category) : all
+  const { data: all, isLoading, isError } = useServices(true)
   const isCombos = category === COMBO_CATEGORY
   const noun = isCombos ? "combo" : "service"
   const Noun = isCombos ? "Combo" : "Service"
-  const deleteService = useDeleteService()
+  const toggleService = useToggleService()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Service | undefined>(undefined)
-  const [deleting, setDeleting] = useState<Service | undefined>(undefined)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("active")
+  const [categoryFilter, setCategoryFilter] = useState("all")
+
+  const data = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase()
+    return (all ?? []).filter((service) => {
+      const active = service.isActive !== false
+      return (
+        (!category || service.category === category) &&
+        (categoryFilter === "all" || service.category === categoryFilter) &&
+        (statusFilter === "all" || (statusFilter === "active" ? active : !active)) &&
+        (!query || `${service.name} ${service.description ?? ""}`.toLocaleLowerCase().includes(query))
+      )
+    })
+  }, [all, category, categoryFilter, search, statusFilter])
 
   function openCreate() {
     setEditing(undefined)
@@ -66,14 +74,13 @@ export function ServicesManagement({
     setFormOpen(true)
   }
 
-  function confirmDelete() {
-    if (!deleting) return
-    deleteService.mutate(deleting.id, {
+  function toggleActive(service: Service) {
+    const isActive = service.isActive === false
+    toggleService.mutate({ id: service.id, isActive }, {
       onSuccess: () => {
-        toast.success(`${Noun} deleted`)
-        setDeleting(undefined)
+        toast.success(`${Noun} ${isActive ? "activated" : "deactivated"}`)
       },
-      onError: () => toast.error(`Could not delete ${noun}. Please try again.`),
+      onError: () => toast.error(`Could not update ${noun}. Please try again.`),
     })
   }
 
@@ -87,6 +94,35 @@ export function ServicesManagement({
         </Button>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_auto_auto]">
+          <Input
+            aria-label={`Search ${noun}s`}
+            placeholder={`Search ${noun}s`}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <select
+            aria-label="Filter by category"
+            className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
+            value={categoryFilter}
+            onChange={(event) => setCategoryFilter(event.target.value)}
+          >
+            <option value="all">All categories</option>
+            {SERVICE_CATEGORIES.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filter by status"
+            className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="all">All statuses</option>
+          </select>
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -95,7 +131,7 @@ export function ServicesManagement({
           <p className="py-8 text-center text-sm text-destructive">
             Could not load {noun}s.
           </p>
-        ) : data.length === 0 ? (
+        ) : !data?.length ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No {noun}s yet. Add your first one.
           </p>
@@ -110,6 +146,9 @@ export function ServicesManagement({
                 >
                   <div className="flex min-w-0 flex-col">
                     <span className="break-words font-medium">{service.name}</span>
+                    <Badge className="mt-1 w-fit" variant={service.isActive === false ? "secondary" : "default"}>
+                      {service.isActive === false ? "Inactive" : "Active"}
+                    </Badge>
                     <span className="text-xs text-muted-foreground">
                       {formatPrice(service.price)} · {formatDuration(service.duration)}
                     </span>
@@ -130,11 +169,13 @@ export function ServicesManagement({
                     </button>
                     <button
                       type="button"
-                      aria-label={`Delete ${noun}`}
-                      onClick={() => setDeleting(service)}
-                      className="inline-flex size-7 items-center justify-center rounded-lg text-destructive hover:bg-destructive/10"
+                      aria-label={`${service.isActive === false ? "Activate" : "Deactivate"} ${noun}`}
+                      title={`${service.isActive === false ? "Activate" : "Deactivate"} ${noun}`}
+                      disabled={toggleService.isPending}
+                      onClick={() => toggleActive(service)}
+                      className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
                     >
-                      <Trash2 className="size-4" />
+                      {toggleService.isPending ? <Loader2 className="size-4 animate-spin" /> : <Power className="size-4" />}
                     </button>
                   </div>
                 </li>
@@ -149,6 +190,7 @@ export function ServicesManagement({
                     <TableHead>{Noun}</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Duration</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="w-20" />
                   </TableRow>
                 </TableHeader>
@@ -157,6 +199,9 @@ export function ServicesManagement({
                     <TableRow key={service.id}>
                       <TableCell className="font-medium">
                         {service.name}
+                        {service.isActive === false && (
+                          <Badge className="ml-2" variant="secondary">Inactive</Badge>
+                        )}
                         {isCombos && !!service.includes?.length && (
                           <span className="block max-w-md truncate text-xs font-normal text-muted-foreground">
                             {service.includes.join(" · ")}
@@ -165,6 +210,11 @@ export function ServicesManagement({
                       </TableCell>
                       <TableCell>{formatPrice(service.price)}</TableCell>
                       <TableCell>{formatDuration(service.duration)}</TableCell>
+                      <TableCell>
+                        <Badge variant={service.isActive === false ? "secondary" : "default"}>
+                          {service.isActive === false ? "Inactive" : "Active"}
+                        </Badge>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <button
@@ -177,11 +227,13 @@ export function ServicesManagement({
                           </button>
                           <button
                             type="button"
-                            aria-label={`Delete ${noun}`}
-                            onClick={() => setDeleting(service)}
-                            className="inline-flex size-7 items-center justify-center rounded-lg text-destructive hover:bg-destructive/10"
+                            aria-label={`${service.isActive === false ? "Activate" : "Deactivate"} ${noun}`}
+                            title={`${service.isActive === false ? "Activate" : "Deactivate"} ${noun}`}
+                            disabled={toggleService.isPending}
+                            onClick={() => toggleActive(service)}
+                            className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
                           >
-                            <Trash2 className="size-4" />
+                            {toggleService.isPending ? <Loader2 className="size-4 animate-spin" /> : <Power className="size-4" />}
                           </button>
                         </div>
                       </TableCell>
@@ -201,29 +253,6 @@ export function ServicesManagement({
         category={category}
       />
 
-      <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(undefined)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete {noun}</DialogTitle>
-            <DialogDescription>
-              This will permanently remove &quot;{deleting?.name}&quot; from your {noun}s.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleting(undefined)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={deleteService.isPending}
-              onClick={confirmDelete}
-            >
-              {deleteService.isPending && <Loader2 className="size-4 animate-spin" />}
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   )
 }

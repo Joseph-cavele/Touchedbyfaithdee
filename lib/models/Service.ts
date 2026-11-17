@@ -1,15 +1,19 @@
 import { Schema, model, models, type InferSchemaType } from "mongoose"
+import { SALON_ID } from "@/lib/salon-identity"
 
 const serviceSchema = new Schema(
   {
-    name: { type: String, required: true },
-    description: { type: String, required: true },
+    salonId: { type: String, required: true, default: SALON_ID },
+    name: { type: String, required: true, trim: true },
+    normalizedName: { type: String, trim: true },
+    description: { type: String, default: "" },
     /* Optional: a service without a confirmed price shows "Price on
        request" everywhere (lib/currency.ts formatPrice) and adds nothing to
        a booking's amount. Never store 0 to mean "unknown". */
     price: { type: Number, min: 0 },
     duration: { type: Number, required: true },
     category: { type: String, default: "Makeup" },
+    isActive: { type: Boolean, default: true },
     image: { type: String },
     /* What a combo bundles, one line per item — the poster's checklist
        ("28" Human Blend Wig", "Wig Installation", …). Empty for ordinary
@@ -32,9 +36,14 @@ const serviceSchema = new Schema(
 // index walk instead of a SORT stage.
 serviceSchema.index({ name: 1 })
 
+serviceSchema.index(
+  { salonId: 1, normalizedName: 1 },
+  { unique: true, partialFilterExpression: { normalizedName: { $type: "string" } } }
+)
+
 // Catalogue and picker, which group by category and order by name within
 // it. `name` as the second key means the grouped read is sorted for free.
-serviceSchema.index({ category: 1, name: 1 })
+serviceSchema.index({ salonId: 1, category: 1, name: 1 })
 
 // The seed's upsert key. Partial, so dashboard-created services (no slug)
 // are not forced to be unique against each other.

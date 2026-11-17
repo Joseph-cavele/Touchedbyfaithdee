@@ -4,6 +4,7 @@ import { ServiceModel } from "../lib/models/Service"
 import { UserModel } from "../lib/models/User"
 import { salonServices, serviceSlug } from "../lib/salon-services"
 import { ownerEmailFromEnv, ownerNameFromEnv } from "../lib/owner-account"
+import { SALON_ID } from "../lib/salon-identity"
 
 /* ══════════════════════════════════════════════════════════════════════
    Seed — IDEMPOTENT. Run it as often as you like; it never creates
@@ -42,6 +43,8 @@ async function seed() {
           update: {
             $set: {
               name: s.name,
+              normalizedName: s.name.trim().toLocaleLowerCase("en-US"),
+              salonId: SALON_ID,
               category: s.category,
               slug,
               ...(s.price !== null ? { price: s.price } : {}),
@@ -49,6 +52,7 @@ async function seed() {
             $setOnInsert: {
               description: s.description,
               duration: s.duration,
+              isActive: true,
               ...(s.includes ? { includes: s.includes } : {}),
             },
           },

@@ -10,6 +10,7 @@ import {
 type BookingWithDurations = {
   bookingTime: string
   services: { duration?: number | null }[]
+  serviceItems?: { duration: number }[]
 }
 
 /**
@@ -30,13 +31,15 @@ export async function getBusyIntervals(
     status: { $in: SLOT_HOLDING_STATUSES },
     ...(excludeBookingId ? { _id: { $ne: excludeBookingId } } : {}),
   })
-    .select("bookingTime services")
+    .select("bookingTime services serviceItems")
     .populate("services", "duration")
     .lean<BookingWithDurations[]>()
 
   return bookings.map((b) => {
     const start = toMinutes(b.bookingTime)
-    const duration = b.services.reduce((sum, s) => sum + (s?.duration ?? 0), 0)
+    const duration = b.serviceItems?.length
+      ? b.serviceItems.reduce((sum, service) => sum + service.duration, 0)
+      : b.services.reduce((sum, s) => sum + (s?.duration ?? 0), 0)
     return { start, end: start + Math.max(duration, MIN_BOOKING_MINUTES) }
   })
 }

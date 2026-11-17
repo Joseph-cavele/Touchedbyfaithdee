@@ -5,6 +5,7 @@ import { useForm, useWatch, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { apiErrorMessage } from "@/lib/api-client"
 import {
   serviceInputSchema,
   COMBO_CATEGORY,
@@ -111,8 +112,8 @@ export function ServiceFormDialog({
         toast.success(`${capitalize(noun)} added`)
       }
       onOpenChange(false)
-    } catch {
-      toast.error(`Could not save ${noun}. Please try again.`)
+    } catch (error) {
+      toast.error(apiErrorMessage(error, `Could not save ${noun}. Please try again.`))
     }
   }
 

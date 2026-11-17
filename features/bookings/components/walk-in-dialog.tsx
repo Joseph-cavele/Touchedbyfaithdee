@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { Loader2, UserPlus } from "lucide-react"
+import { Loader2, Plus, UserPlus, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -11,13 +11,16 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
-import { formatCurrency, formatPrice } from "@/lib/currency"
+import { formatCurrency, formatPrice, formatTotal } from "@/lib/currency"
 import { SALON_HOURS } from "@/lib/salon-contact"
 import { useServices } from "@/features/bookings/hooks/use-services"
 import { useStylists } from "@/features/bookings/hooks/use-stylists"
 import { SERVICE_CATEGORIES } from "@/features/services/schema"
 import { walkInSchema } from "@/features/bookings/walk-in-schema"
 import type { CustomerWithStats } from "@/types"
+import type { Service } from "@/types"
+import { CustomServiceDialog } from "@/features/services/components/custom-service-dialog"
+import type { CustomServiceInputValues } from "@/features/services/schema"
 
 const WALK_IN_TIME_STEP_MINUTES = 5
 
@@ -92,6 +95,8 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
   const [serviceIds, setServiceIds] = useState<string[]>([])
+  const [customServices, setCustomServices] = useState<(CustomServiceInputValues & { id: string })[]>([])
+  const [customServiceDialogOpen, setCustomServiceDialogOpen] = useState(false)
   const [stylistChoice, setStylistChoice] = useState("")
   const [bookingDate, setBookingDate] = useState(initial.date)
   const [bookingTime, setBookingTime] = useState(initial.time)
@@ -112,9 +117,38 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
     })).filter((g) => g.items.length > 0)
   }, [services.data])
 
-  const total = (services.data ?? [])
+  const catalogueTotal = (services.data ?? [])
     .filter((s) => serviceIds.includes(s.id))
     .reduce((sum, s) => sum + (s.price ?? 0), 0)
+  const selectedPrices = [
+    ...(services.data ?? []).filter((service) => serviceIds.includes(service.id)).map((service) => service.price),
+    ...customServices.map((service) => service.price),
+  ]
+  const total = catalogueTotal + customServices.reduce((sum, service) => sum + service.price, 0)
+
+  function addCustomService(service: Service, savedToCatalogue: boolean) {
+    setError(null)
+    if (savedToCatalogue) {
+      queryClient.setQueryData<Service[]>(["services"], (current = []) => [
+        ...current.filter((item) => item.id !== service.id),
+        service,
+      ])
+      setServiceIds((ids) => ids.includes(service.id) ? ids : [...ids, service.id])
+      return
+    }
+
+    setCustomServices((items) => [
+      ...items,
+      {
+        id: service.id,
+        name: service.name,
+        category: service.category as CustomServiceInputValues["category"],
+        price: service.price ?? 0,
+        duration: service.duration,
+        description: service.description ?? "",
+      },
+    ])
+  }
 
   function toggleService(id: string) {
     setError(null)
@@ -122,7 +156,24 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
   }
 
   async function submit() {
-    const values = { name, phone, email, serviceIds, stylistId, bookingDate, bookingTime, status, notes }
+    const values = {
+      name,
+      phone,
+      email,
+      serviceIds,
+      customServices: customServices.map((service) => ({
+        name: service.name,
+        category: service.category,
+        price: service.price,
+        duration: service.duration,
+        description: service.description,
+      })),
+      stylistId,
+      bookingDate,
+      bookingTime,
+      status,
+      notes,
+    }
     const parsed = walkInSchema.safeParse(values)
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Please check the details.")
@@ -249,8 +300,10 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
             <legend className="mb-1 text-sm font-medium">Services</legend>
             {services.isLoading ? (
               <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label="Loading services" />
+            ) : services.isError ? (
+              <p role="alert" className="text-xs text-destructive">Could not load services. Try again.</p>
             ) : byCategory.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No services yet — add them on the Services page.</p>
+              <p className="text-xs text-muted-foreground">No active catalogue services yet.</p>
             ) : (
               <div className="flex max-h-56 flex-col gap-3 overflow-y-auto rounded-lg border border-brand-line p-3">
                 {byCategory.map((group) => (
@@ -280,6 +333,39 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
             )}
+            {customServices.length > 0 && (
+              <ul className="flex flex-col gap-1 rounded-lg border border-brand-line p-3">
+                {customServices.map((service) => (
+                  <li key={service.id} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="min-w-0">
+                      {service.name}
+                      <span className="ml-1 text-xs text-muted-foreground">Custom for this booking</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{formatPrice(service.price)}</span>
+                      <button
+                        type="button"
+                        aria-label={`Remove ${service.name}`}
+                        onClick={() => setCustomServices((items) => items.filter((item) => item.id !== service.id))}
+                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="w-fit rounded-full"
+              onClick={() => setCustomServiceDialogOpen(true)}
+            >
+              <Plus aria-hidden />
+              Add custom service
+            </Button>
           </fieldset>
 
           {/* ── Visit ──────────────────────────────────────────────────── */}
@@ -368,7 +454,7 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
 
         <DialogFooter className="items-center sm:justify-between">
           <p className="text-sm">
-            Total <span className="font-semibold">{formatCurrency(total)}</span>
+          Total <span className="font-semibold">{selectedPrices.length ? formatTotal(selectedPrices) : formatCurrency(total)}</span>
           </p>
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving} className="cursor-pointer rounded-full px-4">
@@ -380,6 +466,11 @@ function WalkInDialog({ onClose }: { onClose: () => void }) {
             </Button>
           </div>
         </DialogFooter>
+        <CustomServiceDialog
+          open={customServiceDialogOpen}
+          onOpenChange={setCustomServiceDialogOpen}
+          onAdd={addCustomService}
+        />
       </DialogContent>
     </Dialog>
   )

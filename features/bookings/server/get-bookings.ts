@@ -1,6 +1,7 @@
 import { connectDB } from "@/lib/db"
 import { BookingModel } from "@/lib/models/Booking"
 import { formatTotal } from "@/lib/currency"
+import { getBookingServiceSnapshots } from "@/features/bookings/server/service-snapshots"
 import type { BookingListItem, BookingStatus } from "@/types"
 
 const VALID_BOOKING_STATUSES = new Set<BookingStatus>([
@@ -18,6 +19,13 @@ interface PopulatedBooking {
   customer: { name: string; email: string } | null
   stylist: { name: string } | null
   services: { name: string; price: number | null | undefined }[]
+  serviceItems?: {
+    serviceId?: unknown
+    serviceName: string
+    price?: number | null
+    duration: number
+  }[]
+  amount: number
   bookingDate: string
   bookingTime: string
   status: string
@@ -56,16 +64,20 @@ export async function getBookings(status?: BookingStatus): Promise<BookingListIt
     .lean<PopulatedBooking[]>()
 
   return bookings.map((b) => {
-    const services = Array.isArray(b.services) ? b.services : []
+    const serviceItems = getBookingServiceSnapshots(b)
+    const total = b.amount ?? serviceItems.reduce((sum, service) => sum + (service.price ?? 0), 0)
 
     return {
       id: String(b._id),
       customerName: b.customer?.name ?? "Unknown",
       customerEmail: b.customer?.email ?? "",
       stylistName: b.stylist?.name ?? "Unknown",
-      serviceNames: services.map((s) => s.name),
-      total: services.reduce((sum, s) => sum + (s.price ?? 0), 0),
-      totalDisplay: formatTotal(services.map((s) => s.price)),
+      serviceNames: serviceItems.map((s) => s.serviceName),
+      serviceItems,
+      total,
+      totalDisplay: b.serviceItems?.length
+        ? formatTotal(serviceItems.map((s) => s.price))
+        : formatTotal([total]),
       bookingDate: b.bookingDate,
       bookingTime: b.bookingTime,
       status: (b.status as BookingStatus) ?? "PENDING",

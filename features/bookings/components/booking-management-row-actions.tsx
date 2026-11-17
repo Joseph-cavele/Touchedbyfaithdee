@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CalendarClock, CalendarX, Check, Eye, Trash2, Loader2 } from "lucide-react"
+import { CalendarClock, CalendarX, Check, Eye, Pencil, Trash2, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { apiErrorMessage } from "@/lib/api-client"
 import { useDeleteBooking } from "@/features/bookings/hooks/use-delete-booking"
@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { TIME_SLOTS } from "@/features/bookings/availability"
+import { BookingServiceEditor } from "@/features/bookings/components/booking-service-editor"
 
 function reminderStatus(
   sentAt?: string,
@@ -41,6 +42,7 @@ export function BookingManagementRowActions({ booking }: { booking: BookingListI
   const [rejectOpen, setRejectOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [rescheduleOpen, setRescheduleOpen] = useState(false)
+  const [editServicesOpen, setEditServicesOpen] = useState(false)
   const [rejectionReason, setRejectionReason] = useState("")
   const [bookingDate, setBookingDate] = useState(booking.bookingDate)
   const [bookingTime, setBookingTime] = useState(booking.bookingTime)
@@ -50,6 +52,7 @@ export function BookingManagementRowActions({ booking }: { booking: BookingListI
   const canCancel = ["PENDING", "PENDING_PAYMENT", "CONFIRMED"].includes(booking.status)
   const canReview = booking.status === "PENDING" || booking.status === "PENDING_PAYMENT"
   const canReschedule = booking.status === "PENDING" || booking.status === "CONFIRMED"
+  const canEditServices = ["PENDING", "PENDING_PAYMENT", "CONFIRMED"].includes(booking.status)
 
   function approveBooking() {
     updateStatus.mutate(
@@ -161,6 +164,17 @@ export function BookingManagementRowActions({ booking }: { booking: BookingListI
           <CalendarClock className="size-4" />
         </button>
       )}
+      {canEditServices && (
+        <button
+          type="button"
+          aria-label="Edit booking services"
+          title="Edit booking services"
+          onClick={() => setEditServicesOpen(true)}
+          className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <Pencil className="size-4" />
+        </button>
+      )}
       <button
         type="button"
         aria-label="View booking"
@@ -268,6 +282,16 @@ export function BookingManagementRowActions({ booking }: { booking: BookingListI
           </div>
         </DialogContent>
       </Dialog>
+
+      {canEditServices && editServicesOpen && (
+        <BookingServiceEditor
+          booking={booking}
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditServicesOpen(false)
+          }}
+        />
+      )}
 
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent>

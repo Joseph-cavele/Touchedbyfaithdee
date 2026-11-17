@@ -12,6 +12,9 @@ import {
   OWNER_APPROVAL_REMINDER_DELAY_MS,
 } from "@/features/notifications/lib/reminder-schedule"
 import { salonDateTime } from "@/lib/date"
+import { customServiceInputSchema } from "@/features/services/schema"
+import { walkInSchema } from "@/features/bookings/walk-in-schema"
+import { getBookingServiceSnapshots, totalBookingAmount, totalBookingDuration } from "@/features/bookings/server/service-snapshots"
 import type { BookingListItem, BookingStatus } from "@/types"
 
 const appointmentAt = salonDateTime("2026-03-20", "12:00")
@@ -74,7 +77,7 @@ test("customer booking accepts in-person payment only and rescheduling requires 
     customerName: "Jane Doe",
     customerEmail: "jane@example.com",
     customerPhone: "073 123 4567",
-    serviceIds: ["service-id"],
+    serviceIds: ["64b000000000000000000001"],
     stylistId: "stylist-id",
     bookingDate: "2026-03-20",
     bookingTime: "12:00",
@@ -93,6 +96,51 @@ test("customer booking accepts in-person payment only and rescheduling requires 
     updateBookingStatusSchema.safeParse({ bookingDate: "2026-03-21" }).success,
     false
   )
+})
+
+test("custom walk-in services validate fields and can be used without a catalogue service", () => {
+  const booking = {
+    name: "Jane Doe",
+    phone: "073 123 4567",
+    serviceIds: [],
+    customServices: [{
+      name: "Protective styling",
+      category: "Hair",
+      price: 450,
+      duration: 90,
+    }],
+    stylistId: "stylist-id",
+    bookingDate: "2026-03-20",
+    bookingTime: "12:00",
+    status: "COMPLETED",
+  }
+
+  assert.equal(walkInSchema.safeParse(booking).success, true)
+  assert.equal(customServiceInputSchema.safeParse({ ...booking.customServices[0], price: -1 }).success, false)
+  assert.equal(customServiceInputSchema.safeParse({ ...booking.customServices[0], price: 0 }).success, true)
+  assert.equal(customServiceInputSchema.safeParse({ ...booking.customServices[0], price: undefined }).success, false)
+  assert.equal(customServiceInputSchema.safeParse({ ...booking.customServices[0], duration: 0 }).success, false)
+  assert.equal(walkInSchema.safeParse({ ...booking, customServices: [] }).success, false)
+  assert.equal(
+    walkInSchema.safeParse({ ...booking, serviceIds: ["service-id", "service-id"] }).success,
+    false
+  )
+})
+
+test("booking service totals and historical snapshots do not depend on later catalogue prices", () => {
+  const snapshots = [
+    { serviceId: "service-a", serviceName: "Installation", price: 300, duration: 120 },
+    { serviceId: null, serviceName: "Custom treatment", price: 450, duration: 45 },
+  ]
+  const items = getBookingServiceSnapshots({
+    serviceItems: snapshots,
+    services: [{ name: "Installation", price: 900, duration: 240 }],
+  })
+
+  assert.equal(totalBookingAmount(items), 750)
+  assert.equal(totalBookingDuration(items), 165)
+  assert.equal(items[0].price, 300)
+  assert.equal(items[1].serviceId, null)
 })
 
 function renderBookingActions(status: BookingStatus) {

@@ -4,6 +4,7 @@ import { salonDateOf, salonToday } from "@/lib/date"
 import { BookingModel } from "@/lib/models/Booking"
 import { StylistModel } from "@/lib/models/Stylist"
 import type { DashboardData } from "@/types"
+import { getBookingServiceSnapshots } from "@/features/bookings/server/service-snapshots"
 
 interface PopulatedService {
   _id: unknown
@@ -16,6 +17,12 @@ interface PopulatedBooking {
   customer: { name: string; email?: string } | null
   stylist: { name: string } | null
   services: PopulatedService[]
+  serviceItems?: {
+    serviceId?: unknown
+    serviceName: string
+    price?: number | null
+    duration: number
+  }[]
   bookingDate: string
   bookingTime: string
   status: string
@@ -105,8 +112,8 @@ async function fetchDashboardData(): Promise<DashboardData> {
   const serviceCounts = new Map<string, number>()
   for (const booking of realBookings) {
     if (booking.status === "CANCELLED") continue
-    for (const service of booking.services) {
-      serviceCounts.set(service.name, (serviceCounts.get(service.name) ?? 0) + 1)
+    for (const service of getBookingServiceSnapshots(booking)) {
+      serviceCounts.set(service.serviceName, (serviceCounts.get(service.serviceName) ?? 0) + 1)
     }
   }
   const servicesPerformance = Array.from(serviceCounts.entries())
@@ -127,7 +134,7 @@ async function fetchDashboardData(): Promise<DashboardData> {
       id: String(b._id),
       customerName: b.customer?.name ?? "Unknown",
       stylistName: b.stylist?.name ?? "Unknown",
-      serviceNames: b.services.map((s) => s.name),
+      serviceNames: getBookingServiceSnapshots(b).map((s) => s.serviceName),
       bookingDate: b.bookingDate,
       bookingTime: b.bookingTime,
       status: b.status as DashboardData["upcomingAppointments"][number]["status"],
@@ -138,8 +145,8 @@ async function fetchDashboardData(): Promise<DashboardData> {
     .slice(0, 8)
     .map((b) => ({
       id: String(b._id),
-      description: `${b.customer?.name ?? "A customer"} — ${b.services
-        .map((s) => s.name)
+      description: `${b.customer?.name ?? "A customer"} — ${getBookingServiceSnapshots(b)
+        .map((s) => s.serviceName)
         .join(", ")} with ${b.stylist?.name ?? "a stylist"} (${b.status})`,
       updatedAt: String(b.updatedAt),
     }))
@@ -169,6 +176,6 @@ async function fetchDashboardData(): Promise<DashboardData> {
  */
 export const getDashboardData = unstable_cache(
   fetchDashboardData,
-  ["dashboard-data-v4"],
+  ["dashboard-data-v5"],
   { tags: ["dashboard"], revalidate: 60 }
 )

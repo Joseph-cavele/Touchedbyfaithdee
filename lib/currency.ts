@@ -17,7 +17,7 @@ export function formatPrice(value: number | null | undefined) {
 
 /** True when a service has a confirmed price. */
 export const hasPrice = (value: number | null | undefined): value is number =>
-  typeof value === "number" && value > 0
+  typeof value === "number" && Number.isFinite(value)
 
 /**
  * Total for a set of services. Unpriced services add nothing, and say so:

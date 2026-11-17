@@ -5,6 +5,20 @@ const bookingSchema = new Schema(
     customer: { type: Schema.Types.ObjectId, ref: "Customer", required: true },
     stylist: { type: Schema.Types.ObjectId, ref: "Stylist", required: true },
     services: [{ type: Schema.Types.ObjectId, ref: "Service", required: true }],
+    serviceItems: {
+      type: [
+        new Schema(
+          {
+            serviceId: { type: Schema.Types.ObjectId, ref: "Service", default: null },
+            serviceName: { type: String, required: true },
+            price: { type: Number, min: 0 },
+            duration: { type: Number, required: true, min: 1 },
+          },
+          { _id: false }
+        ),
+      ],
+      default: undefined,
+    },
     bookingDate: { type: String, required: true },
     bookingTime: { type: String, required: true },
     description: { type: String },

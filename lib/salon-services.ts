@@ -18,7 +18,7 @@ import { salonImages, serviceImage } from "./salon-assets"
 import { SALON_HOURS } from "./salon-contact"
 
 /** Must match SERVICE_CATEGORIES in features/services/schema.ts. */
-export type SalonServiceCategory = "Makeup" | "Hair" | "Combos"
+export type SalonServiceCategory = "Makeup" | "Hair" | "Combos" | "Nails" | "Other"
 
 export type SalonService = {
   name: string

@@ -1,11 +1,18 @@
 import { connectDB } from "@/lib/db"
 import { BookingModel } from "@/lib/models/Booking"
 import type { ReportsData } from "@/types"
+import { getBookingServiceSnapshots } from "@/features/bookings/server/service-snapshots"
 
 interface PopulatedBooking {
   _id: unknown
   stylist: { name: string } | null
   services: { name: string; price: number }[]
+  serviceItems?: {
+    serviceId?: unknown
+    serviceName: string
+    price?: number | null
+    duration: number
+  }[]
   bookingDate: string
   status: string
   amount?: number
@@ -24,7 +31,7 @@ const REVENUE_STATUSES = new Set(["CONFIRMED", "COMPLETED"])
 
 function bookingTotal(b: PopulatedBooking) {
   // Unpriced ("price on request") services contribute nothing to revenue.
-  const serviceTotal = b.services.reduce((sum, s) => sum + (s.price ?? 0), 0)
+  const serviceTotal = getBookingServiceSnapshots(b).reduce((sum, s) => sum + (s.price ?? 0), 0)
   // Use the amount captured when booked; fall back for legacy records without one.
   return b.amount && b.amount > 0 ? b.amount : serviceTotal
 }
@@ -87,11 +94,11 @@ export async function getReports(): Promise<ReportsData> {
   const serviceMap = new Map<string, { count: number; revenue: number }>()
   for (const b of bookings) {
     if (b.status === "CANCELLED" || b.status === "REJECTED") continue
-    for (const s of b.services) {
-      const entry = serviceMap.get(s.name) ?? { count: 0, revenue: 0 }
+    for (const s of getBookingServiceSnapshots(b)) {
+      const entry = serviceMap.get(s.serviceName) ?? { count: 0, revenue: 0 }
       entry.count += 1
       if (b.status === "COMPLETED") entry.revenue += s.price ?? 0
-      serviceMap.set(s.name, entry)
+      serviceMap.set(s.serviceName, entry)
     }
   }
   const topServices = Array.from(serviceMap.entries())

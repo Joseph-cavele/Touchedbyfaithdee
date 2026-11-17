@@ -18,6 +18,8 @@ import { newBookingOwnerEmailHtml } from "@/emails/new-booking-owner"
 import { bookingRequestReceivedEmailHtml } from "@/emails/booking-reminders"
 import type { BookingStatus } from "@/types"
 import { requireOwner } from "@/lib/auth-guard"
+import { getBookingServiceSnapshots, totalBookingAmount } from "@/features/bookings/server/service-snapshots"
+import { salonServiceFilter } from "@/features/services/server/ownership"
 
 export async function GET(req: NextRequest) {
   const denied = await requireOwner()
@@ -60,10 +62,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Stylist not found" }, { status: 404 })
   }
 
-  const services = await ServiceModel.find({ _id: { $in: serviceIds } })
+  const services = await ServiceModel.find({
+    _id: { $in: serviceIds },
+    $and: [
+      salonServiceFilter(),
+      { $or: [{ isActive: true }, { isActive: { $exists: false } }] },
+    ],
+  })
   if (services.length !== serviceIds.length) {
-    return NextResponse.json({ error: "One or more services not found" }, { status: 404 })
+    return NextResponse.json({ error: "One or more selected services are unavailable." }, { status: 404 })
   }
+  const serviceById = new Map(services.map((service) => [String(service._id), service]))
+  const orderedServices = serviceIds.map((id) => serviceById.get(id)!)
 
   /* Double-booking guard. The new booking runs for the sum of its services'
      durations and must not overlap anything the stylist already holds that
@@ -82,7 +92,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     )
   }
-  const duration = services.reduce((sum, s) => sum + (s.duration ?? 0), 0)
+  const duration = orderedServices.reduce((sum, s) => sum + (s.duration ?? 0), 0)
   if (runsPastClosing(toMinutes(bookingTime), duration)) {
     return NextResponse.json(
       { error: "Those services would run past closing time. Please choose an earlier time." },
@@ -110,14 +120,16 @@ export async function POST(req: NextRequest) {
      This figure is what Paystack is asked to charge AND what the verified
      charge is checked against, so a client-supplied total would let anyone
      book a R1,500 install for R1. */
-  const amount = services.reduce((sum, s) => sum + (s.price ?? 0), 0)
+  const serviceItems = getBookingServiceSnapshots({ services: orderedServices })
+  const amount = totalBookingAmount(serviceItems)
 
-  const totalDisplay = formatTotal(services.map((s) => s.price))
+  const totalDisplay = formatTotal(serviceItems.map((s) => s.price))
 
   const booking = await BookingModel.create({
     customer: customer._id,
     stylist: stylist._id,
-    services: services.map((s) => s._id),
+    services: orderedServices.map((s) => s._id),
+    serviceItems,
     bookingDate,
     bookingTime,
     description,
@@ -151,7 +163,7 @@ export async function POST(req: NextRequest) {
         subject: "Touchedbyfaithdee Studio — booking request received",
         html: bookingRequestReceivedEmailHtml({
           customerName,
-          serviceNames: services.map((s) => s.name),
+          serviceNames: serviceItems.map((s) => s.serviceName),
           bookingDate,
           bookingTime,
         }),
@@ -172,7 +184,7 @@ export async function POST(req: NextRequest) {
           customerName,
           customerEmail,
           stylistName: stylist.name,
-          serviceNames: services.map((s) => s.name),
+          serviceNames: serviceItems.map((s) => s.serviceName),
           bookingDate,
           bookingTime,
           totalDisplay,

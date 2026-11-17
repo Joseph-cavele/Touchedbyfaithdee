@@ -18,12 +18,25 @@ import { appointmentCancelledEmailHtml } from "@/emails/appointment-cancelled"
 import { bookingRejectedEmailHtml } from "@/emails/booking-reminders"
 import { requireOwner } from "@/lib/auth-guard"
 import type { BookingStatus } from "@/types"
+import {
+  getBookingServiceSnapshots,
+  totalBookingAmount,
+  totalBookingDuration,
+} from "@/features/bookings/server/service-snapshots"
+import { ServiceModel } from "@/lib/models/Service"
+import { salonServiceFilter } from "@/features/services/server/ownership"
 
 interface PopulatedBooking {
   _id: unknown
   customer: { name: string; email: string }
   stylist: { _id: unknown; name: string }
   services: { name: string; price?: number | null; duration?: number | null }[]
+  serviceItems?: {
+    serviceId?: unknown
+    serviceName: string
+    price?: number | null
+    duration: number
+  }[]
   bookingDate: string
   bookingTime: string
   status: BookingStatus
@@ -51,7 +64,7 @@ export async function PATCH(
     )
   }
 
-  const { status, reason, bookingDate, bookingTime } = parsed.data
+  const { status, reason, bookingDate, bookingTime, serviceIds, customServices } = parsed.data
 
   await connectDB()
 
@@ -73,9 +86,13 @@ export async function PATCH(
     (bookingDate !== booking.bookingDate || bookingTime !== booking.bookingTime)
   const approval = statusChanged && nextStatus === "CONFIRMED"
   const rejection = statusChanged && nextStatus === "REJECTED"
+  const servicesChanged = serviceIds !== undefined || customServices !== undefined
 
-  if (!statusChanged && !rescheduled) {
+  if (!statusChanged && !rescheduled && !servicesChanged) {
     return NextResponse.json({ id, status: nextStatus, emailSent: null })
+  }
+  if (servicesChanged && ["REJECTED", "CANCELLED", "COMPLETED", "NO_SHOW"].includes(booking.status)) {
+    return NextResponse.json({ error: "Services cannot be changed on a closed booking." }, { status: 409 })
   }
 
   if (statusChanged) {
@@ -87,8 +104,64 @@ export async function PATCH(
     }
   }
 
+  let bookingServiceItems = getBookingServiceSnapshots(booking)
+  let updatedServices: { _id: unknown; name: string; price?: number | null; duration?: number | null }[] = []
+  if (servicesChanged) {
+    const currentServiceIds = booking.services.map((service) => String((service as { _id?: unknown })._id ?? service))
+    const nextServiceIds = serviceIds ?? currentServiceIds
+    const customServiceItems =
+      customServices ??
+      bookingServiceItems
+        .filter((service) => !service.serviceId)
+        .map((service) => ({
+          name: service.serviceName,
+          category: "Other" as const,
+          price: service.price ?? 0,
+          duration: service.duration,
+          description: "",
+        }))
+
+    updatedServices = nextServiceIds.length
+      ? await ServiceModel.find({
+          _id: { $in: nextServiceIds },
+          $and: [
+            salonServiceFilter(),
+            {
+              $or: [
+                { isActive: true },
+                { isActive: { $exists: false } },
+                { _id: { $in: currentServiceIds } },
+              ],
+            },
+          ],
+        })
+      : []
+    if (updatedServices.length !== nextServiceIds.length) {
+      return NextResponse.json({ error: "One or more selected services are unavailable." }, { status: 404 })
+    }
+
+    const serviceById = new Map(updatedServices.map((service) => [String(service._id), service]))
+    bookingServiceItems = [
+      ...nextServiceIds.map((serviceId) => {
+        const service = serviceById.get(serviceId)!
+        return {
+          serviceId,
+          serviceName: service.name,
+          price: service.price,
+          duration: service.duration ?? 0,
+        }
+      }),
+      ...customServiceItems.map((service) => ({
+        serviceId: null,
+        serviceName: service.name,
+        price: service.price,
+        duration: service.duration,
+      })),
+    ]
+  }
+
   if (
-    (approval || rescheduled) &&
+    (approval || rescheduled || servicesChanged) &&
     ["PENDING", "PENDING_PAYMENT", "CONFIRMED"].includes(booking.status)
   ) {
     const targetDate = bookingDate ?? booking.bookingDate
@@ -101,7 +174,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Choose an appointment time within opening hours." }, { status: 400 })
     }
 
-    const duration = booking.services.reduce((sum, service) => sum + (service.duration ?? 0), 0)
+    const duration = totalBookingDuration(bookingServiceItems)
     if (runsPastClosing(toMinutes(targetTime), duration)) {
       return NextResponse.json(
         { error: "Those services would run past closing time. Choose an earlier time." },
@@ -121,6 +194,11 @@ export async function PATCH(
   const setFields: Record<string, unknown> = {}
   const unsetFields: Record<string, 1> = {}
   if (statusChanged) setFields.status = nextStatus
+  if (servicesChanged) {
+    setFields.services = updatedServices.map((service) => service._id)
+    setFields.serviceItems = bookingServiceItems
+    setFields.amount = totalBookingAmount(bookingServiceItems)
+  }
   if (rescheduled) {
     setFields.bookingDate = bookingDate
     setFields.bookingTime = bookingTime
@@ -181,7 +259,7 @@ export async function PATCH(
   // Status changes move bookings between the dashboard's counts and revenue.
   revalidateTag("dashboard", { expire: 0 })
 
-  const serviceNames = booking.services.map((s) => s.name)
+  const serviceNames = bookingServiceItems.map((s) => s.serviceName)
 
   // null = no email applies to this status; true/false = whether it was sent.
   let emailSent: boolean | null = null
@@ -202,7 +280,7 @@ export async function PATCH(
               serviceNames,
               bookingDate: bookingDate ?? booking.bookingDate,
               bookingTime: bookingTime ?? booking.bookingTime,
-              totalDisplay: formatTotal(booking.services.map((s) => s.price)),
+              totalDisplay: formatTotal(bookingServiceItems.map((s) => s.price)),
             }),
           }
         : nextStatus === "REJECTED"

@@ -12,7 +12,7 @@ export type BookingStatus =
 export interface Service {
   id: string
   name: string
-  description: string
+  description?: string
   /** Rand. Absent = not confirmed yet — display with formatPrice(). */
   price?: number
   duration: number
@@ -20,6 +20,7 @@ export interface Service {
   image?: string
   /** A combo's checklist of what it bundles. */
   includes?: string[]
+  isActive?: boolean
 }
 
 export interface Stylist {
@@ -55,6 +56,12 @@ export interface Booking {
   customer: Customer
   stylist: Stylist
   services: Service[]
+  serviceItems?: {
+    serviceId: string | null
+    serviceName: string
+    price?: number | null
+    duration: number
+  }[]
   bookingDate: string
   bookingTime: string
   description?: string
@@ -141,6 +148,12 @@ export interface BookingListItem {
   customerEmail: string
   stylistName: string
   serviceNames: string[]
+  serviceItems?: {
+    serviceId: string | null
+    serviceName: string
+    price?: number | null
+    duration: number
+  }[]
   /** Sum of the priced services only. */
   total: number
   /** Display string from formatTotal() — never "R 0" for unpriced services. */
