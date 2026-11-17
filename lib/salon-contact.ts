@@ -70,8 +70,8 @@ export const SALON_HOURS_DISPLAY = `${SALON_HOURS.days}, ${SALON_HOURS.open}–$
  *
  * A URL here is a public claim in the same way the phone number is, and a
  * wrong one is worse than a missing one: a guessed handle sends customers to
- * a stranger's page. So it starts empty and gets the real URL from the
- * client. While blank, the footer shows the icon as an inert mark rather
+ * a stranger's page. Leave profiles blank until the client provides their
+ * real URL. While blank, the footer shows the icon as an inert mark rather
  * than a link.
  */
 export type SalonSocial = {
@@ -82,10 +82,9 @@ export type SalonSocial = {
 }
 
 export const SALON_SOCIALS: SalonSocial[] = [
-  // TODO(client): the studio's own profile URLs.
-  { label: "Facebook", url: "" },
-  { label: "Instagram", url: "" },
-  { label: "TikTok", url: "" },
+  { label: "Facebook", url: "https://www.facebook.com/share/1CJgtckFQ7/?mibextid=wwXIfr" },
+  { label: "Instagram", url: "https://www.instagram.com/touchedbyfaithdee_studio?vrfl=MWE1OWx0aGZ4M2podw%3D%3D&utm_source=qr" },
+  { label: "TikTok", url: "https://www.tiktok.com/@touchedbyfaithdee" },
 ]
 
 /**
