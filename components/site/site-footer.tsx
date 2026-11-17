@@ -28,7 +28,7 @@ const socialIcons: Record<string, IconType> = {
 const socials = SALON_SOCIALS.filter((s) => socialIcons[s.label])
 
 const socialClass =
-  "grid size-9 place-items-center rounded-full border transition-colors duration-300"
+  "grid size-9 cursor-pointer place-items-center rounded-full border transition-colors duration-300"
 
 /* Surface grey against the black page, so the page has something to close
    against. Single skin — the header dropped its two-tone
